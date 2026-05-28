@@ -27,12 +27,14 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.10",
-    "tailwindcss": "^3.4.19",
+    "postcss-cli": "^11.0.1",
+    "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3"
   }
 }
