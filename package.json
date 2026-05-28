@@ -1,0 +1,22 @@
+{
+  "name": "microgpt-3d-tutorial",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An interactive 3D-visualized tutorial for Karpathy's pure-Python microGPT.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check-assets": "node scripts/check-assets.mjs",
+    "e2e:ci": "playwright test",
+    "analyze": "ANALYZE=true next build"
+  },
+  "engines": {
+    "node": ">=20.10.0",
+    "pnpm": ">=9.0.0"
+  }
+}
