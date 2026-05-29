@@ -57,8 +57,16 @@ export function MatrixGrid({
 
   if (!cellMesh) return null;
 
+  // We deliberately do NOT pass the glb's baked material here. CellMat in
+  // cell.glb has a hardcoded near-black Base Color (rgb 0.039) and no vertex
+  // color hookup, so <Instance color> writes to the `instanceColor` buffer
+  // attribute that the imported material silently ignores — every cell renders
+  // black. A fresh meshStandardMaterial with `vertexColors` reads that buffer
+  // and the per-cell colors actually show. Geometry from the glb is kept so the
+  // cell silhouette (size/bevel) stays authored in Blender.
   return (
-    <Instances geometry={cellMesh.geometry as never} material={cellMesh.material as never}>
+    <Instances geometry={cellMesh.geometry as never} limit={rows * cols}>
+      <meshStandardMaterial vertexColors roughness={0.6} metalness={0} />
       {Array.from({ length: rows }).map((_, r) =>
         Array.from({ length: cols }).map((_, c) => {
           const x = origin[0] + c * spacing;

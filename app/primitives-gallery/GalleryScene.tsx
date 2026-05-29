@@ -49,22 +49,25 @@ const LIGHT_PALETTE: Palette = {
   },
 };
 
-// Dark = cyberpunk. Body bumped from #3a3f55 to #5a6582 so the reactiveColor
-// lerp (which darkens to color × 0.4 at the front-view extreme) still leaves
-// the dark endpoint above the stage's near-black, and the bright endpoint
-// reads as a clearly brighter slate. The rig is tuned for directional
-// contrast over fill: low ambient/hemi, strong magenta key, modest cyan rim.
-// The emissive accent is dialed back from 2.5 → 1.0 so cyan trim is visible
-// without washing out the matte body — the result is natural PBR shading
-// depth as the camera orbits, rather than the previous flat cyan-bath look.
+// Dark = cyberpunk, but rig neutralized. Previous rig used a magenta-tinted
+// key (#ffccff) plus a saturated cyan rim (#aaffff @ 0.5) which, combined with
+// the cyan emissive accent on the .glb (strength 1.0), painted the slate body
+// uniform cyan-mint regardless of the reactiveColor lerp — the user couldn't
+// see the angle-driven brightness shift at all. Fix: switch the key to slightly
+// warm white (#ffeedd) and the rim to neutral white (#ffffff @ 0.35) so neither
+// light tints the body. Accent strength dropped 1.0 → 0.7 so cyan trim still
+// reads as design accent without dominating. Body lifted #5a6582 → #7a8090 so
+// the bright end (lerp t=1) is visibly distinct from the dark end (#30343a at
+// t=0, i.e. body × 0.4). Result: matte slate cubes that clearly show the
+// angle-driven brightness lerp as the camera orbits, with cyan trim accents.
 const DARK_PALETTE: Palette = {
   pageBg: '#0a0a14',
   stageBg: '#06060a',
-  body: '#5a6582',
-  arrowBody: '#5a6582',
+  body: '#7a8090',
+  arrowBody: '#7a8090',
   gridColors: ['#440066', '#330055'] as const,
   accent: '#00ffff',
-  accentStrength: 1.0,
+  accentStrength: 0.7,
   // Lime-green palette: previous magenta (rgb(180,40,140) floor) was confirmed
   // present in both source and the live `_next/static/chunks/*.js` bundle,
   // but reads as near-black against the cyan-rim + magenta-key lighting rig
@@ -84,9 +87,9 @@ const DARK_PALETTE: Palette = {
     hemi: 0.2,
     hemiColors: ['#202840', '#0a0a1a'] as const,
     key: 1.4,
-    keyColor: '#ffccff',
-    rim: 0.5,
-    rimColor: '#aaffff',
+    keyColor: '#ffeedd',
+    rim: 0.35,
+    rimColor: '#ffffff',
   },
 };
 
