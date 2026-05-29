@@ -36,3 +36,6 @@ blender/_tmp/
 
 # Playwright static-serve staging dir
 .pw-serve/
+
+# microGPT training data cache (downloaded at runtime by src/microgpt_annotated.py)
+input.txt
