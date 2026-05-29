@@ -1,10 +1,24 @@
 'use client';
 
 import { useGLTF, Html } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import type { Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/token.glb';
+
+// White text + black halo + translucent pill — readable on any cube color
+// and on both Nextra themes without per-theme detection.
+const labelStyle: CSSProperties = {
+  pointerEvents: 'none',
+  color: '#fff',
+  fontSize: 22,
+  fontWeight: 700,
+  textShadow: '0 0 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.6)',
+  padding: '2px 6px',
+  borderRadius: 4,
+  background: 'rgba(0,0,0,0.35)',
+  userSelect: 'none',
+};
 
 export interface TokenCubeProps {
   position: [number, number, number];
@@ -31,7 +45,7 @@ export function TokenCube({ position, char, color = '#d8e8ff' }: TokenCubeProps)
   return (
     <group position={position}>
       <primitive object={scene} />
-      <Html center distanceFactor={6} style={{ pointerEvents: 'none', color: '#102030', fontSize: 18, fontWeight: 600 }}>
+      <Html center distanceFactor={6} style={labelStyle}>
         {char}
       </Html>
     </group>

@@ -1,10 +1,24 @@
 'use client';
 
 import { useGLTF, Html } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import type { Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/node.glb';
+
+// White text with a black halo + translucent pill reads well on either the
+// light or dark Nextra theme without per-theme detection.
+const labelStyle: CSSProperties = {
+  pointerEvents: 'none',
+  color: '#fff',
+  fontSize: 18,
+  fontWeight: 700,
+  textShadow: '0 0 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.6)',
+  padding: '2px 6px',
+  borderRadius: 4,
+  background: 'rgba(0,0,0,0.35)',
+  userSelect: 'none',
+};
 
 interface MeshLike {
   isMesh?: boolean;
@@ -42,7 +56,7 @@ export function NodeBlock({ position, label, color = '#ffffff', glow = false }: 
     <group position={position}>
       <primitive object={scene} />
       {label ? (
-        <Html position={[0, 0.65, 0]} center distanceFactor={6} style={{ pointerEvents: 'none', color: '#fff', fontSize: 12 }}>
+        <Html position={[0, 0.65, 0]} center distanceFactor={6} style={labelStyle}>
           {label}
         </Html>
       ) : null}
