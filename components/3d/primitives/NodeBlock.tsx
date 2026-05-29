@@ -24,9 +24,24 @@ const labelStyle: CSSProperties = {
 interface MeshLike {
   isMesh?: boolean;
   material?: {
+    name?: string;
     color?: { set: (c: string) => void };
+    emissive?: { r?: number; g?: number; b?: number };
     emissiveIntensity?: number;
   };
+}
+
+// True when this material is the cyan emissive accent baked into the .glb
+// (NodeBlockEmissiveMat). We detect via emissive intensity / emissive color,
+// falling back to the material name for safety. Keeping these accents untinted
+// preserves the cyberpunk neon look against the matte black body.
+function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
+  if ((mat.emissiveIntensity ?? 0) > 0) return true;
+  const r = mat.emissive?.r ?? 0;
+  const g = mat.emissive?.g ?? 0;
+  const b = mat.emissive?.b ?? 0;
+  if (r + g + b > 0) return true;
+  return mat.name === 'NodeBlockEmissiveMat';
 }
 
 export interface NodeBlockProps {
@@ -43,24 +58,30 @@ export function NodeBlock({ position, label, color = '#ffffff', glow = false }: 
     const cloned = gltf.scene.clone(true);
     cloned.traverse((object: Object3D) => {
       const obj = object as unknown as MeshLike;
-      if (obj.isMesh && obj.material) {
-        obj.material.color?.set(color);
-        if (obj.material.emissiveIntensity !== undefined) {
-          obj.material.emissiveIntensity = glow ? 0.5 : 0;
+      if (!obj.isMesh || !obj.material) return;
+      const mat = obj.material;
+      if (isEmissiveAccent(mat)) {
+        // Drive emissive pulse via emissiveIntensity only — never tint
+        if (mat.emissiveIntensity !== undefined) {
+          mat.emissiveIntensity = glow ? 0.5 : 1.0;
         }
+        return;
       }
+      mat.color?.set(color);
     });
     return cloned;
   }, [gltf.scene, color, glow]);
 
   // Subtle emissive pulse when glow is on — gives the block a "live" feel
-  // without distracting motion. No-op when glow is false.
+  // without distracting motion. No-op when glow is false. Only touches the
+  // emissive accent material (others have no emissiveIntensity to drive).
   const groupRef = useRef<Group>(null);
   useFrame(({ clock }) => {
     if (!groupRef.current || !glow) return;
     groupRef.current.traverse((object: Object3D) => {
       const mesh = object as unknown as MeshLike;
-      if (mesh.material?.emissiveIntensity !== undefined) {
+      if (!mesh.material || !isEmissiveAccent(mesh.material)) return;
+      if (mesh.material.emissiveIntensity !== undefined) {
         mesh.material.emissiveIntensity = 0.4 + 0.2 * Math.sin(clock.elapsedTime * 2);
       }
     });

@@ -19,7 +19,24 @@ export interface ConnectorArrowProps {
 
 interface MeshLike {
   isMesh?: boolean;
-  material?: { color?: { set: (c: string) => void } };
+  material?: {
+    name?: string;
+    color?: { set: (c: string) => void };
+    emissive?: { r?: number; g?: number; b?: number };
+    emissiveIntensity?: number;
+  };
+}
+
+// The arrow .glb has two materials: ArrowShaftMat (matte black, tinted at
+// runtime) and ArrowTipMat (cyan emissive — left untouched so the tip glows
+// cyan against any shaft color).
+function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
+  if ((mat.emissiveIntensity ?? 0) > 0) return true;
+  const r = mat.emissive?.r ?? 0;
+  const g = mat.emissive?.g ?? 0;
+  const b = mat.emissive?.b ?? 0;
+  if (r + g + b > 0) return true;
+  return mat.name === 'ArrowTipMat';
 }
 
 export function ConnectorArrow({
@@ -46,7 +63,9 @@ export function ConnectorArrow({
     const cloned = gltf.scene.clone(true);
     cloned.traverse((obj: Object3D) => {
       const mesh = obj as unknown as MeshLike;
-      if (mesh.isMesh && mesh.material) mesh.material.color?.set(color);
+      if (!mesh.isMesh || !mesh.material) return;
+      if (isEmissiveAccent(mesh.material)) return;
+      mesh.material.color?.set(color);
     });
 
     return {

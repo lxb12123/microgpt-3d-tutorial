@@ -28,7 +28,23 @@ export interface TokenCubeProps {
 
 interface MeshLike {
   isMesh?: boolean;
-  material?: { color?: { set: (c: string) => void } };
+  material?: {
+    name?: string;
+    color?: { set: (c: string) => void };
+    emissive?: { r?: number; g?: number; b?: number };
+    emissiveIntensity?: number;
+  };
+}
+
+// Skip the cyan emissive underglow bar (TokenCubeGlowMat) so the cyberpunk
+// accent isn't washed out by the runtime body color override.
+function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
+  if ((mat.emissiveIntensity ?? 0) > 0) return true;
+  const r = mat.emissive?.r ?? 0;
+  const g = mat.emissive?.g ?? 0;
+  const b = mat.emissive?.b ?? 0;
+  if (r + g + b > 0) return true;
+  return mat.name === 'TokenCubeGlowMat';
 }
 
 export function TokenCube({ position, char, color = '#d8e8ff' }: TokenCubeProps) {
@@ -37,7 +53,9 @@ export function TokenCube({ position, char, color = '#d8e8ff' }: TokenCubeProps)
     const cloned = gltf.scene.clone(true);
     cloned.traverse((obj: Object3D) => {
       const mesh = obj as unknown as MeshLike;
-      if (mesh.isMesh && mesh.material) mesh.material.color?.set(color);
+      if (!mesh.isMesh || !mesh.material) return;
+      if (isEmissiveAccent(mesh.material)) return;
+      mesh.material.color?.set(color);
     });
     return cloned;
   }, [gltf.scene, color]);
