@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "check-assets": "node scripts/check-assets.mjs",
     "e2e:ci": "playwright test",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true next build",
+    "bench": "tsx scripts/bench-inference.ts"
   },
   "engines": {
     "node": ">=20.10.0",
@@ -48,6 +49,7 @@
     "postcss-cli": "^11.0.1",
     "serve": "^14.2.6",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }
