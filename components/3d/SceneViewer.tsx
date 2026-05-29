@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, type ReactNode } from 'react';
+import { Suspense, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as webgl from './webgl';
@@ -17,8 +17,23 @@ export interface SceneViewerProps {
   hud?: ReactNode;
 }
 
+// React 19 pattern: server snapshot returns the "common-case" value (true =
+// canvas markup), so SSR + first client render produce identical HTML. After
+// the initial commit, getSnapshot's real result takes over and the component
+// re-renders if needed.
+const noopSubscribe = () => () => {};
+function useWebGLAvailable(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => webgl.isWebGLAvailable(),   // client snapshot
+    () => true,                        // server snapshot (assume available)
+  );
+}
+
 export function SceneViewer({ height, fallbackImage, children, hud }: SceneViewerProps) {
-  if (!webgl.isWebGLAvailable()) {
+  const webglAvailable = useWebGLAvailable();
+
+  if (!webglAvailable) {
     return (
       <div style={{ width: '100%', height, position: 'relative' }}>
         <img
