@@ -49,30 +49,34 @@ const LIGHT_PALETTE: Palette = {
   },
 };
 
-// Dark = cyberpunk. Body lightened from the original #1a1a24 (which was
-// invisible against the #06060a stage) to #3a3f55 so silhouettes read. The
-// rig is tuned for directional contrast over fill: low ambient/hemi, strong
-// magenta key, modest cyan rim. The emissive accent is dialed back from
-// 2.5 → 1.0 so cyan trim is visible without washing out the matte body —
-// the result is natural PBR shading depth as the camera orbits, rather
-// than the previous flat cyan-bath look.
+// Dark = cyberpunk. Body bumped from #3a3f55 to #5a6582 so the reactiveColor
+// lerp (which darkens to color × 0.4 at the front-view extreme) still leaves
+// the dark endpoint above the stage's near-black, and the bright endpoint
+// reads as a clearly brighter slate. The rig is tuned for directional
+// contrast over fill: low ambient/hemi, strong magenta key, modest cyan rim.
+// The emissive accent is dialed back from 2.5 → 1.0 so cyan trim is visible
+// without washing out the matte body — the result is natural PBR shading
+// depth as the camera orbits, rather than the previous flat cyan-bath look.
 const DARK_PALETTE: Palette = {
   pageBg: '#0a0a14',
   stageBg: '#06060a',
-  body: '#3a3f55',
-  arrowBody: '#3a3f55',
+  body: '#5a6582',
+  arrowBody: '#5a6582',
   gridColors: ['#440066', '#330055'] as const,
   accent: '#00ffff',
   accentStrength: 1.0,
-  // Magenta-pink palette: pairs with the cyan emissive trim elsewhere in
-  // the scene (cyan + magenta = classic cyberpunk dyad) and pops against
-  // the near-black stage. Floor at saturated magenta so v=0 still reads;
-  // ceiling at hot pink so v controls brightness as a gradient.
-  // v=0 → rgb(180,40,140), v=0.5 → rgb(217,70,185), v=1 → rgb(255,100,230).
+  // Lime-green palette: previous magenta (rgb(180,40,140) floor) was confirmed
+  // present in both source and the live `_next/static/chunks/*.js` bundle,
+  // but reads as near-black against the cyan-rim + magenta-key lighting rig
+  // because the rim light desaturates the red channel. Lime green sits at
+  // the opposite end of the color wheel from magenta and survives the rig's
+  // tinted lighting much better. Floor at rgb(80,220,40) — saturated bright
+  // lime, impossible to miss against the near-black stage.
+  // v=0 → rgb(80,220,40), v=0.5 → rgb(130,237,80), v=1 → rgb(180,255,120).
   cellColorFn: (v: number) => {
-    const r = Math.round(180 + v * 75);
-    const g = Math.round(40 + v * 60);
-    const b = Math.round(140 + v * 90);
+    const r = Math.round(80 + v * 100);
+    const g = Math.round(220 + v * 35);
+    const b = Math.round(40 + v * 80);
     return `rgb(${r}, ${g}, ${b})`;
   },
   lighting: {
@@ -127,9 +131,15 @@ export function GalleryScene() {
         {/* Floor grid sets the stage tone — soft gray for light,
             purple/magenta for dark. */}
         <gridHelper args={[20, 40, p.gridColors[0], p.gridColors[1]]} position={[0, -2, 0]} />
+        {/* x and y NodeBlocks use angle-driven reactiveColor: the body color
+            interpolates as a pure function of the camera azimuth (reversible
+            on counter-rotation, no time-based pulse). `glow` is intentionally
+            omitted on `y` — its emissive sine pulse reads as an unwanted
+            color shift over time. */}
         <NodeBlock
           position={[-3, 1, 0]}
           label="x"
+          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
@@ -137,10 +147,10 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, -1, 0]}
           label="y"
+          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
-          glow
         />
         <ConnectorArrow
           from={[-3, 1, 0]}

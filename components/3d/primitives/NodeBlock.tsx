@@ -56,18 +56,21 @@ export interface NodeBlockProps {
    *  When omitted, defaults to 1.0 (or 0.5 when `glow` is active, since the
    *  glow animation drives intensity downward from a baseline). */
   accentStrength?: number;
-  /** When true, the body color is NOT applied on mount. Instead, it lerps
-   *  from the .glb's baked material color toward `color` as the user rotates
-   *  the scene via OrbitControls. Provides a tactile "wakes up when touched"
-   *  feel. Rotation accumulates monotonically and clamps at π radians, so
-   *  the color holds when the user stops rotating (no decay). */
+  /** When true, the body color is NOT applied on mount. Instead, it is
+   *  interpolated each frame as a pure function of the camera azimuth angle
+   *  (relative to the world origin). At azimuth=0 (front-on) the body sits
+   *  at a darker shade derived from `color`; at azimuth=±π (back-on) it
+   *  reaches the full `color`. The mapping uses `(cos(azimuth)+1)/2` so the
+   *  result is **reversible**: rotating clockwise and then counter-clockwise
+   *  returns to the same color rather than monotonically progressing. No
+   *  time-based animation; no accumulator; pure instantaneous angle → color. */
   reactiveColor?: boolean;
 }
 
-// Baseline body color used when reactiveColor=true — matches the .glb's
-// matte-black baked body so the lerp starts from the unadulterated cyberpunk
-// look and shifts toward the prop `color` only as the user rotates.
-const REACTIVE_BASELINE_HEX = '#0a0a0a';
+// Darkening factor applied to the prop `color` to derive the "front" endpoint
+// of the reactiveColor lerp. 0.4 keeps the hue but drops brightness by 60%,
+// which gives a noticeable but not jarring oscillation as the user orbits.
+const REACTIVE_DARKEN_FACTOR = 0.4;
 
 export function NodeBlock({
   position,
@@ -121,48 +124,33 @@ export function NodeBlock({
     });
   });
 
-  // Reactive-color hook: lerp body color from matte black toward `color`,
-  // driven by accumulated camera rotation. Refs (not state) so we avoid
-  // re-renders on every frame. Conditionally a no-op when reactiveColor=false.
+  // Reactive-color hook: body color is a pure function of the current camera
+  // azimuth. No accumulator, no time term — so the mapping is reversible
+  // (rotating away and back returns to the original color). Endpoints are
+  // derived from the `color` prop: the "back" endpoint is `color` itself, the
+  // "front" endpoint is a darker shade (color × REACTIVE_DARKEN_FACTOR).
+  // Refs/useMemo allocations are kept outside the conditional so hook order
+  // stays stable regardless of the `reactiveColor` flag.
   const { camera } = useThree();
-  const prevAzimuthRef = useRef<number | null>(null);
-  const prevPolarRef = useRef<number | null>(null);
-  const rotationAccumRef = useRef(0);
-  const baselineColor = useMemo(() => new Color(REACTIVE_BASELINE_HEX), []);
-  const targetColor = useMemo(() => new Color(color), [color]);
+  const colorDark = useMemo(
+    () => new Color(color).multiplyScalar(REACTIVE_DARKEN_FACTOR),
+    [color],
+  );
+  const colorLight = useMemo(() => new Color(color), [color]);
   const scratchColor = useMemo(() => new Color(), []);
 
   useFrame(() => {
     if (!reactiveColor || !groupRef.current || !camera) return;
 
-    // Derive camera polar/azimuth assuming OrbitControls keeps looking at the
-    // origin (which is true for the gallery's default SceneViewer setup).
-    const v = camera.position;
-    const r = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) || 1;
-    const azimuth = Math.atan2(v.x, v.z);
-    const polar = Math.acos(Math.max(-1, Math.min(1, v.y / r)));
+    // Azimuth assumes OrbitControls keeps the target at the world origin
+    // (true for the gallery's default SceneViewer setup). atan2(x, z) gives
+    // an angle in [-π, π]; cos of that maps both ±θ to the same t, which is
+    // what makes the recolor reversible on counter-rotation.
+    const azimuth = Math.atan2(camera.position.x, camera.position.z);
+    const t = (Math.cos(azimuth) + 1) / 2; // azimuth=0 → 1, azimuth=±π → 0
 
-    // First frame: seed prev values and skip — avoids a spurious "jump"
-    // on the very first tick where prev=0 would make the delta huge.
-    if (prevAzimuthRef.current === null || prevPolarRef.current === null) {
-      prevAzimuthRef.current = azimuth;
-      prevPolarRef.current = polar;
-      return;
-    }
-
-    // Wrap-safe azimuth delta (azimuth is in [-π, π], so a jump from ~π to ~-π
-    // is really a tiny step, not a full revolution). Use the shorter arc.
-    let dAz = Math.abs(azimuth - prevAzimuthRef.current);
-    if (dAz > Math.PI) dAz = 2 * Math.PI - dAz;
-    const dPol = Math.abs(polar - prevPolarRef.current);
-
-    rotationAccumRef.current = Math.min(rotationAccumRef.current + dAz + dPol, Math.PI);
-    prevAzimuthRef.current = azimuth;
-    prevPolarRef.current = polar;
-
-    // Map [0, π] → [0, 1]; ~half a turn of rotation fully shifts the color.
-    const t = Math.min(rotationAccumRef.current / Math.PI, 1);
-    scratchColor.copy(baselineColor).lerp(targetColor, t);
+    // Lerp from dark (front view) up to the full `color` (back view).
+    scratchColor.copy(colorDark).lerp(colorLight, t);
     const hex = `#${scratchColor.getHexString()}`;
 
     groupRef.current.traverse((object: Object3D) => {
