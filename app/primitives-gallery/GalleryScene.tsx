@@ -33,7 +33,7 @@ const LIGHT_PALETTE: Palette = {
   arrowBody: '#71717a',
   gridColors: ['#d4d4d8', '#e4e4e7'] as const,
   accent: '#fb923c',
-  accentStrength: 1.0,
+  accentStrength: 0.6,
   // Dark cells against a light bg — high values opaque/dark, low values
   // still visibly inked (alpha floored at 0.35) so even the dimmest cell
   // leaves a faint dark mark rather than vanishing into the near-white stage.
@@ -51,9 +51,11 @@ const LIGHT_PALETTE: Palette = {
 
 // Dark = cyberpunk. Body lightened from the original #1a1a24 (which was
 // invisible against the #06060a stage) to #3a3f55 so silhouettes read. The
-// neon-tinted multi-source rig and cyan accent are preserved, but all
-// intensities are bumped ~30% from the 1d87af2 baseline since the previous
-// pass was also too dim overall.
+// rig is tuned for directional contrast over fill: low ambient/hemi, strong
+// magenta key, modest cyan rim. The emissive accent is dialed back from
+// 2.5 → 1.0 so cyan trim is visible without washing out the matte body —
+// the result is natural PBR shading depth as the camera orbits, rather
+// than the previous flat cyan-bath look.
 const DARK_PALETTE: Palette = {
   pageBg: '#0a0a14',
   stageBg: '#06060a',
@@ -61,24 +63,25 @@ const DARK_PALETTE: Palette = {
   arrowBody: '#3a3f55',
   gridColors: ['#440066', '#330055'] as const,
   accent: '#00ffff',
-  accentStrength: 2.5,
-  // Floor at a visible navy-cyan so v≈0 cells still register against the
-  // dark stage; ceiling stays a bright neon cyan so v controls brightness
-  // as a gradient rather than as visibility. v=0 → rgb(0,80,120),
-  // v=0.5 → rgb(40,167,187), v=1 → rgb(80,255,255).
+  accentStrength: 1.0,
+  // Magenta-pink palette: pairs with the cyan emissive trim elsewhere in
+  // the scene (cyan + magenta = classic cyberpunk dyad) and pops against
+  // the near-black stage. Floor at saturated magenta so v=0 still reads;
+  // ceiling at hot pink so v controls brightness as a gradient.
+  // v=0 → rgb(180,40,140), v=0.5 → rgb(217,70,185), v=1 → rgb(255,100,230).
   cellColorFn: (v: number) => {
-    const r = Math.round(v * 80);
-    const g = Math.round(80 + v * 175);
-    const b = Math.round(120 + v * 135);
+    const r = Math.round(180 + v * 75);
+    const g = Math.round(40 + v * 60);
+    const b = Math.round(140 + v * 90);
     return `rgb(${r}, ${g}, ${b})`;
   },
   lighting: {
-    ambient: 0.25,
-    hemi: 0.5,
+    ambient: 0.08,
+    hemi: 0.2,
     hemiColors: ['#202840', '#0a0a1a'] as const,
-    key: 0.9,
+    key: 1.4,
     keyColor: '#ffccff',
-    rim: 0.7,
+    rim: 0.5,
     rimColor: '#aaffff',
   },
 };
@@ -127,7 +130,6 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, 1, 0]}
           label="x"
-          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
@@ -135,7 +137,6 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, -1, 0]}
           label="y"
-          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
