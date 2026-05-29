@@ -33,3 +33,6 @@ test-results/
 blender/_tmp/
 *.blend
 *.blend1
+
+# Playwright static-serve staging dir
+.pw-serve/
