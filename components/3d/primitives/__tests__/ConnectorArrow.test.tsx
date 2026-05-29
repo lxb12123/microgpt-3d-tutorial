@@ -2,6 +2,9 @@ import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectorArrow } from '../ConnectorArrow';
 
+vi.mock('@react-three/fiber', () => ({
+  useFrame: () => {},
+}));
 vi.mock('@react-three/drei', () => {
   const useGLTF = Object.assign(
     () => ({ scene: { clone: () => ({ traverse: () => {} }) } }),

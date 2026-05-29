@@ -1,9 +1,10 @@
 'use client';
 
 import { useGLTF } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Vector3, Quaternion } from 'three';
-import type { Object3D } from 'three';
+import type { Group, Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/arrow.glb';
 
@@ -12,7 +13,7 @@ export interface ConnectorArrowProps {
   to: [number, number, number];
   color?: string;
   direction?: 'fwd' | 'bwd';
-  /** Reserved for future use; the dash animation effect is not yet implemented. */
+  /** When true, subtly pulses the arrow length to suggest flow. */
   animatedDash?: boolean;
 }
 
@@ -21,10 +22,16 @@ interface MeshLike {
   material?: { color?: { set: (c: string) => void } };
 }
 
-export function ConnectorArrow({ from, to, color = '#ffffff', direction = 'fwd' }: ConnectorArrowProps) {
+export function ConnectorArrow({
+  from,
+  to,
+  color = '#ffffff',
+  direction = 'fwd',
+  animatedDash = false,
+}: ConnectorArrowProps) {
   const gltf = useGLTF(URL);
 
-  const { scene, position, quaternion, scale } = useMemo(() => {
+  const { scene, position, quaternion, scale, baseScaleX } = useMemo(() => {
     const fromVec = new Vector3(...from);
     const toVec = new Vector3(...to);
     const direction3 = direction === 'bwd' ? fromVec.clone().sub(toVec) : toVec.clone().sub(fromVec);
@@ -47,11 +54,22 @@ export function ConnectorArrow({ from, to, color = '#ffffff', direction = 'fwd' 
       position: mid.toArray() as [number, number, number],
       quaternion: quat.toArray() as [number, number, number, number],
       scale: [length, 1, 1] as [number, number, number],
+      baseScaleX: length,
     };
   }, [from, to, color, direction, gltf.scene]);
 
+  // Subtle ±3% length pulse along X — keeps cross-section steady, just hints
+  // at flow when `animatedDash` is on.
+  const groupRef = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    if (groupRef.current && animatedDash) {
+      const s = 1 + 0.03 * Math.sin(clock.elapsedTime * 3);
+      groupRef.current.scale.x = baseScaleX * s;
+    }
+  });
+
   return (
-    <group position={position} quaternion={quaternion} scale={scale}>
+    <group ref={groupRef} position={position} quaternion={quaternion} scale={scale}>
       <primitive object={scene} />
     </group>
   );

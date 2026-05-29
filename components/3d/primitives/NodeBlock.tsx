@@ -1,8 +1,9 @@
 'use client';
 
 import { useGLTF, Html } from '@react-three/drei';
-import { useMemo, type CSSProperties } from 'react';
-import type { Object3D } from 'three';
+import { useMemo, useRef, type CSSProperties } from 'react';
+import { useFrame } from '@react-three/fiber';
+import type { Group, Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/node.glb';
 
@@ -52,8 +53,21 @@ export function NodeBlock({ position, label, color = '#ffffff', glow = false }: 
     return cloned;
   }, [gltf.scene, color, glow]);
 
+  // Subtle emissive pulse when glow is on — gives the block a "live" feel
+  // without distracting motion. No-op when glow is false.
+  const groupRef = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    if (!groupRef.current || !glow) return;
+    groupRef.current.traverse((object: Object3D) => {
+      const mesh = object as unknown as MeshLike;
+      if (mesh.material?.emissiveIntensity !== undefined) {
+        mesh.material.emissiveIntensity = 0.4 + 0.2 * Math.sin(clock.elapsedTime * 2);
+      }
+    });
+  });
+
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       <primitive object={scene} />
       {label ? (
         <Html position={[0, 0.65, 0]} center distanceFactor={6} style={labelStyle}>

@@ -4,6 +4,7 @@ import { NodeBlock } from '../NodeBlock';
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="canvas">{children}</div>,
+  useFrame: () => {},
 }));
 vi.mock('@react-three/drei', () => {
   const useGLTF = Object.assign(

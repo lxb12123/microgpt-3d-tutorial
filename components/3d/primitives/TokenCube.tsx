@@ -1,8 +1,9 @@
 'use client';
 
 import { useGLTF, Html } from '@react-three/drei';
-import { useMemo, type CSSProperties } from 'react';
-import type { Object3D } from 'three';
+import { useMemo, useRef, type CSSProperties } from 'react';
+import { useFrame } from '@react-three/fiber';
+import type { Group, Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/token.glb';
 
@@ -42,8 +43,14 @@ export function TokenCube({ position, char, color = '#d8e8ff' }: TokenCubeProps)
     return cloned;
   }, [gltf.scene, color]);
 
+  // Slow Y-axis drift so tokens feel alive without being distracting.
+  const groupRef = useRef<Group>(null);
+  useFrame((_, delta) => {
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.15;
+  });
+
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       <primitive object={scene} />
       <Html center distanceFactor={6} style={labelStyle}>
         {char}
