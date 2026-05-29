@@ -6,6 +6,16 @@ import { OrbitControls } from '@react-three/drei';
 import * as webgl from './webgl';
 import { SceneErrorBoundary } from './SceneErrorBoundary';
 
+export interface SceneLighting {
+  ambient: number;
+  hemi: number;
+  hemiColors: readonly [string, string];
+  key: number;
+  keyColor: string;
+  rim: number;
+  rimColor: string;
+}
+
 export interface SceneViewerProps {
   /** CSS height, e.g. "600px" or "60vh". Required so layout never collapses. */
   height: string;
@@ -15,7 +25,24 @@ export interface SceneViewerProps {
   children: ReactNode;
   /** Optional HUD rendered above the canvas. */
   hud?: ReactNode;
+  /** Optional canvas background color. When omitted, the canvas stays transparent and the page bg shows through. */
+  bgColor?: string;
+  /** Optional lighting rig override. When omitted, uses the cyberpunk-neutral default below. */
+  lighting?: SceneLighting;
 }
+
+// Default lighting (cyberpunk-tinted, used when caller doesn't pass a rig).
+// Kept identical to the pre-prop values so existing callers (e.g. sandbox-check)
+// look the same without any change.
+const DEFAULT_LIGHTING: SceneLighting = {
+  ambient: 0.15,
+  hemi: 0.3,
+  hemiColors: ['#202840', '#0a0a1a'] as const,
+  key: 0.6,
+  keyColor: '#ffccff',
+  rim: 0.5,
+  rimColor: '#aaffff',
+};
 
 // React 19 pattern: server snapshot returns the "common-case" value (true =
 // canvas markup), so SSR + first client render produce identical HTML. After
@@ -30,7 +57,14 @@ function useWebGLAvailable(): boolean {
   );
 }
 
-export function SceneViewer({ height, fallbackImage, children, hud }: SceneViewerProps) {
+export function SceneViewer({
+  height,
+  fallbackImage,
+  children,
+  hud,
+  bgColor,
+  lighting = DEFAULT_LIGHTING,
+}: SceneViewerProps) {
   const webglAvailable = useWebGLAvailable();
 
   if (!webglAvailable) {
@@ -50,19 +84,16 @@ export function SceneViewer({ height, fallbackImage, children, hud }: SceneViewe
       {hud ? <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
       <SceneErrorBoundary>
         <Canvas camera={{ position: [3, 3, 3], fov: 50 }}>
-          {/* Cyberpunk-tinted multi-source rig:
-              - hemisphereLight: cool blue sky / near-black ground fill
-              - ambientLight: small flat baseline (kept low so blacks stay black)
-              - key directional (front-top-right): magenta-tinted, drives
-                colour on the lit side of matte black bodies
-              - rim directional (back-top-left): cyan-tinted, traces a neon
-                halo on the back edges; complements the .glb's cyan emissives
-              Tuned darker overall vs. the previous neutral rig so the
-              emissive accents read as "glowing" rather than getting drowned. */}
-          <hemisphereLight args={['#202840', '#0a0a1a', 0.3]} />
-          <ambientLight intensity={0.15} />
-          <directionalLight position={[5, 8, 5]} intensity={0.6} color={'#ffccff'} castShadow={false} />
-          <directionalLight position={[-4, 3, -4]} intensity={0.5} color={'#aaffff'} />
+          {/* Multi-source rig driven by the `lighting` prop. The default rig
+              keeps the cyberpunk look (cool hemi + magenta key + cyan rim);
+              callers can pass a softer warm rig for light-mode usage. The
+              optional `bgColor` clears the canvas to a flat color so the
+              stage doesn't bleed through to the page bg behind it. */}
+          {bgColor ? <color attach="background" args={[bgColor]} /> : null}
+          <hemisphereLight args={[lighting.hemiColors[0], lighting.hemiColors[1], lighting.hemi]} />
+          <ambientLight intensity={lighting.ambient} />
+          <directionalLight position={[5, 8, 5]} intensity={lighting.key} color={lighting.keyColor} castShadow={false} />
+          <directionalLight position={[-4, 3, -4]} intensity={lighting.rim} color={lighting.rimColor} />
           <Suspense fallback={null}>{children}</Suspense>
           <OrbitControls makeDefault />
         </Canvas>

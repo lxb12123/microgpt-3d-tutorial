@@ -26,7 +26,7 @@ interface MeshLike {
   material?: {
     name?: string;
     color?: { set: (c: string) => void };
-    emissive?: { r?: number; g?: number; b?: number };
+    emissive?: { r?: number; g?: number; b?: number; set?: (c: string) => void };
     emissiveIntensity?: number;
   };
 }
@@ -49,9 +49,23 @@ export interface NodeBlockProps {
   label?: string;
   color?: string;
   glow?: boolean;
+  /** Override the emissive accent color (the cyan rim baked into the .glb).
+   *  When omitted, the .glb's baked color is preserved. */
+  accentColor?: string;
+  /** Override emissive intensity (0 = matte, higher = brighter glow).
+   *  When omitted, defaults to 1.0 (or 0.5 when `glow` is active, since the
+   *  glow animation drives intensity downward from a baseline). */
+  accentStrength?: number;
 }
 
-export function NodeBlock({ position, label, color = '#ffffff', glow = false }: NodeBlockProps) {
+export function NodeBlock({
+  position,
+  label,
+  color = '#ffffff',
+  glow = false,
+  accentColor,
+  accentStrength,
+}: NodeBlockProps) {
   const gltf = useGLTF(URL);
   // Clone so each instance is independent (material edits won't bleed between instances)
   const scene = useMemo(() => {
@@ -61,16 +75,20 @@ export function NodeBlock({ position, label, color = '#ffffff', glow = false }: 
       if (!obj.isMesh || !obj.material) return;
       const mat = obj.material;
       if (isEmissiveAccent(mat)) {
-        // Drive emissive pulse via emissiveIntensity only — never tint
+        // Optionally retint the emissive accent (used for per-theme palettes,
+        // e.g. cyan in dark mode, warm amber in light mode).
+        if (accentColor && mat.emissive?.set) mat.emissive.set(accentColor);
+        // Drive emissive intensity — explicit override wins, otherwise the
+        // existing glow/baseline behavior is preserved for back-compat.
         if (mat.emissiveIntensity !== undefined) {
-          mat.emissiveIntensity = glow ? 0.5 : 1.0;
+          mat.emissiveIntensity = accentStrength ?? (glow ? 0.5 : 1.0);
         }
         return;
       }
       mat.color?.set(color);
     });
     return cloned;
-  }, [gltf.scene, color, glow]);
+  }, [gltf.scene, color, glow, accentColor, accentStrength]);
 
   // Subtle emissive pulse when glow is on — gives the block a "live" feel
   // without distracting motion. No-op when glow is false. Only touches the

@@ -24,6 +24,11 @@ export interface TokenCubeProps {
   position: [number, number, number];
   char: string;
   color?: string;
+  /** Override the emissive accent color (the cyan underglow bar).
+   *  When omitted, the .glb's baked color is preserved. */
+  accentColor?: string;
+  /** Override emissive intensity (0 = matte, higher = brighter glow). */
+  accentStrength?: number;
 }
 
 interface MeshLike {
@@ -31,7 +36,7 @@ interface MeshLike {
   material?: {
     name?: string;
     color?: { set: (c: string) => void };
-    emissive?: { r?: number; g?: number; b?: number };
+    emissive?: { r?: number; g?: number; b?: number; set?: (c: string) => void };
     emissiveIntensity?: number;
   };
 }
@@ -47,18 +52,31 @@ function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
   return mat.name === 'TokenCubeGlowMat';
 }
 
-export function TokenCube({ position, char, color = '#d8e8ff' }: TokenCubeProps) {
+export function TokenCube({
+  position,
+  char,
+  color = '#d8e8ff',
+  accentColor,
+  accentStrength,
+}: TokenCubeProps) {
   const gltf = useGLTF(URL);
   const scene = useMemo(() => {
     const cloned = gltf.scene.clone(true);
     cloned.traverse((obj: Object3D) => {
       const mesh = obj as unknown as MeshLike;
       if (!mesh.isMesh || !mesh.material) return;
-      if (isEmissiveAccent(mesh.material)) return;
-      mesh.material.color?.set(color);
+      const mat = mesh.material;
+      if (isEmissiveAccent(mat)) {
+        if (accentColor && mat.emissive?.set) mat.emissive.set(accentColor);
+        if (accentStrength !== undefined && mat.emissiveIntensity !== undefined) {
+          mat.emissiveIntensity = accentStrength;
+        }
+        return;
+      }
+      mat.color?.set(color);
     });
     return cloned;
-  }, [gltf.scene, color]);
+  }, [gltf.scene, color, accentColor, accentStrength]);
 
   return (
     <group position={position}>
