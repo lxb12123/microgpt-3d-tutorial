@@ -13,7 +13,7 @@ export default function SandboxCheckPage() {
         Phase 0 smoke test. If the cube is rotating below, the full pipeline (Blender → .glb →
         Next.js static export → R3F render) is working end-to-end.
       </p>
-      <SceneViewer height="480px" fallbackImage="/microgpt-3d-tutorial/models/_hello.png">
+      <SceneViewer height="480px" fallbackImage="/microgpt-3d-tutorial/models/previews/hello.png">
         <HelloCube />
       </SceneViewer>
     </main>
