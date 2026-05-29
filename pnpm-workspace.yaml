@@ -1,0 +1,2 @@
+patchedDependencies:
+  nextra-theme-docs: patches/nextra-theme-docs.patch
