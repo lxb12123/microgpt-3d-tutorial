@@ -42,9 +42,12 @@ interface MeshLike {
 }
 
 // Skip the cyan emissive underglow bar (TokenCubeGlowMat) so the cyberpunk
-// accent isn't washed out by the runtime body color override.
+// accent isn't washed out by the runtime body color override. Detect via the
+// emissive color sum or the material name — NOT via emissiveIntensity, which
+// three.js MeshStandardMaterial defaults to 1.0 even on materials with zero
+// emissive color (would false-positive every material in the .glb and paint
+// the body cyan, which is exactly the bug we hit).
 function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
-  if ((mat.emissiveIntensity ?? 0) > 0) return true;
   const r = mat.emissive?.r ?? 0;
   const g = mat.emissive?.g ?? 0;
   const b = mat.emissive?.b ?? 0;

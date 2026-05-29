@@ -32,11 +32,13 @@ interface MeshLike {
 }
 
 // True when this material is the cyan emissive accent baked into the .glb
-// (NodeBlockEmissiveMat). We detect via emissive intensity / emissive color,
-// falling back to the material name for safety. Keeping these accents untinted
-// preserves the cyberpunk neon look against the matte black body.
+// (NodeBlockEmissiveMat). Detect via the emissive color sum (non-zero only on
+// the accent) OR the material name. Do NOT check emissiveIntensity — three.js
+// MeshStandardMaterial defaults `emissiveIntensity = 1.0` even when the
+// emissive color is (0,0,0), so that check would (and previously did) flag
+// the matte body material as an accent, painting the cube cyan and locking
+// out the body-color override entirely.
 function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
-  if ((mat.emissiveIntensity ?? 0) > 0) return true;
   const r = mat.emissive?.r ?? 0;
   const g = mat.emissive?.g ?? 0;
   const b = mat.emissive?.b ?? 0;

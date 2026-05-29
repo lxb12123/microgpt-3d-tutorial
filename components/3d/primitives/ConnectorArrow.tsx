@@ -34,9 +34,11 @@ interface MeshLike {
 
 // The arrow .glb has two materials: ArrowShaftMat (matte black, tinted at
 // runtime) and ArrowTipMat (cyan emissive — left untouched so the tip glows
-// cyan against any shaft color).
+// cyan against any shaft color). Detect via the emissive color sum or the
+// material name. Do NOT check emissiveIntensity — three.js MeshStandardMaterial
+// defaults it to 1.0 even on materials with zero emissive color, so that check
+// would false-positive the shaft and paint it cyan.
 function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
-  if ((mat.emissiveIntensity ?? 0) > 0) return true;
   const r = mat.emissive?.r ?? 0;
   const g = mat.emissive?.g ?? 0;
   const b = mat.emissive?.b ?? 0;

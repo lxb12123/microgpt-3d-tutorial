@@ -58,15 +58,23 @@ export function MatrixGrid({
   if (!cellMesh) return null;
 
   // We deliberately do NOT pass the glb's baked material here. CellMat in
-  // cell.glb has a hardcoded near-black Base Color (rgb 0.039) and no vertex
-  // color hookup, so <Instance color> writes to the `instanceColor` buffer
-  // attribute that the imported material silently ignores — every cell renders
-  // black. A fresh meshStandardMaterial with `vertexColors` reads that buffer
-  // and the per-cell colors actually show. Geometry from the glb is kept so the
-  // cell silhouette (size/bevel) stays authored in Blender.
+  // cell.glb has a hardcoded near-black Base Color (rgb 0.039); even though
+  // drei <Instance color> writes to instanceColor (which the three.js shader
+  // multiplies into the material base color), `instance × 0.039 ≈ 0` renders
+  // every cell black. A fresh meshStandardMaterial defaults to white base
+  // color, so `instance × 1.0 = instance` shows through. Geometry from the
+  // glb is kept so the cell silhouette (size/bevel) stays authored in Blender.
+  //
+  // IMPORTANT: do NOT set `vertexColors` on this material. drei's <Instance>
+  // writes to `instanceColor` (per-instance, handled by InstancedMesh's
+  // dedicated shader path); `vertexColors:true` enables the per-vertex `color`
+  // attribute path, which the cell geometry does NOT provide (no COLOR_0 in
+  // the glb) — that path hands the shader an undefined vec3 and the whole
+  // mesh renders pure black. The two color paths are orthogonal: instanceColor
+  // works without (and is broken by) `vertexColors`.
   return (
     <Instances geometry={cellMesh.geometry as never} limit={rows * cols}>
-      <meshStandardMaterial vertexColors roughness={0.6} metalness={0} />
+      <meshStandardMaterial roughness={0.6} metalness={0} />
       {Array.from({ length: rows }).map((_, r) =>
         Array.from({ length: cols }).map((_, c) => {
           const x = origin[0] + c * spacing;
