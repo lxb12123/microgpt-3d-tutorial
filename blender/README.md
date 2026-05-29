@@ -1,32 +1,53 @@
-# Blender MCP Workflow
+# Blender Workflow
 
 This project generates every `.glb` asset by running a Python script in Blender. The scripts live in `blender/scripts/`; their outputs are committed to `public/models/`.
 
-We orchestrate Blender remotely via [Blender MCP Server](https://github.com/ahujasid/blender-mcp). Once the server is running, an AI agent (or a human via the same protocol) can invoke Blender from outside the GUI.
+## Primary workflow: headless CLI
 
-## One-time setup
+The canonical way to regenerate a `.glb` is:
 
-1. **Verify Blender is installed.** Blender ≥ 4.0 recommended.
+```bash
+blender --background --python blender/scripts/<name>.py
+```
 
-   ```bash
-   blender --version
-   ```
+`--background` skips the GUI; the script's `bpy.ops.export_scene.gltf(filepath=...)` call writes the `.glb` to the path it computes from `__file__`. The CLI is zero-setup, deterministic, and produces byte-identical output across machines.
 
-2. **Install the `blender-mcp` Python package** into the Python environment Blender uses for its addons, then enable the addon inside Blender.
+On macOS Blender often isn't on `PATH`; the actual binary lives at:
 
-   Specific steps vary by OS and Blender version; consult the upstream README at https://github.com/ahujasid/blender-mcp for the current procedure. After installation, "Blender MCP" should appear under Blender → Preferences → Add-ons.
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background --python blender/scripts/<name>.py
+```
 
-3. **Start the MCP server inside Blender.** The default port is `9876` on `localhost`.
+Verify your install:
 
-4. **Smoke test.** From this repo root, run:
+```bash
+blender --version   # or the absolute path above
+```
 
-   ```bash
-   pnpm exec node blender/scripts/_invoke.mjs blender/scripts/_hello_cube.py
-   ```
+Blender ≥ 4.0 is required. The project was built against 4.5 LTS.
 
-   This dispatches `_hello_cube.py` through the MCP server. On success, `public/models/_hello.glb` exists and is < 50 KB.
+### Regenerating all assets
 
-   (The `_invoke.mjs` helper is **not yet written** in Phase 0 — for the manual bootstrap, you can instead open `_hello_cube.py` in Blender's text editor and run it directly. Phase 1+ will add the helper for repeatable invocation.)
+To rebuild every `.glb` in one shot:
+
+```bash
+for f in blender/scripts/*.py; do
+  blender --background --python "$f"
+done
+pnpm check-assets   # verify size + path conventions
+```
+
+## Optional: Blender MCP Server
+
+[Blender MCP Server](https://github.com/ahujasid/blender-mcp) exposes Blender to AI agents as a long-running RPC service — useful when you want a model to **explore** geometry interactively (e.g., "try a slightly bigger bevel; render a screenshot; iterate"). It is **not** required for this repository: every committed `.glb` has a corresponding deterministic `.py` script that runs cleanly under the CLI workflow above.
+
+If you want the MCP path:
+
+1. Install `blender-mcp` per its upstream README and enable the addon in Blender → Preferences → Add-ons.
+2. Start the server inside Blender (default `localhost:9876`).
+3. Drive it from your AI agent of choice.
+
+The MCP route does **not** produce different `.glb`s than the CLI route — same scripts, same outputs. Pick whichever fits your iteration loop.
 
 ## Authoring rules (enforced by `scripts/check-assets.mjs`)
 
@@ -40,5 +61,7 @@ See `docs/superpowers/specs/2026-05-28-microgpt-3d-tutorial-design.md` §5 for t
 
 ## Troubleshooting
 
-- **MCP server not reachable:** confirm Blender is running, the addon is enabled, and port `9876` is not blocked.
-- **Script runs but no `.glb` appears:** the script must end with `bpy.ops.export_scene.gltf(filepath=<absolute path>, export_format='GLB')`. Check the path is absolute, not relative to Blender's CWD (which differs from this repo's root).
+- **`blender` not on PATH (macOS):** use `/Applications/Blender.app/Contents/MacOS/Blender`. Or add `alias blender=...` to your shell rc file.
+- **Script runs but no `.glb` appears:** the script must end with `bpy.ops.export_scene.gltf(filepath=<absolute path>, export_format='GLB')`. Check the path is absolute, not relative to Blender's CWD.
+- **`pnpm check-assets` fails after regen:** read the message; usually a size cap or filename casing. Adjust the script (e.g., lower the bevel/subdivision) and re-run.
+- **MCP server not reachable (only if you opted into MCP):** confirm Blender is running, the addon is enabled, and port `9876` is not blocked.
