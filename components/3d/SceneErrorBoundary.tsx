@@ -15,7 +15,6 @@ export class SceneErrorBoundary extends Component<{ children: ReactNode }, State
 
   componentDidCatch(error: unknown) {
     // Surface to dev tools; do not crash the page.
-    // eslint-disable-next-line no-console
     console.error('[SceneViewer] caught error in 3D subtree:', error);
   }
 
