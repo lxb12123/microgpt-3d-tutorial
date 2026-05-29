@@ -39,3 +39,7 @@ blender/_tmp/
 
 # microGPT training data cache (downloaded at runtime by src/microgpt_annotated.py)
 input.txt
+
+# Python bytecode caches (from src/microgpt_annotated.py training script)
+__pycache__/
+*.pyc
