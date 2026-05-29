@@ -32,3 +32,19 @@ describe('SceneViewer', () => {
     expect(outer.style.height).toBe('640px');
   });
 });
+
+describe('SceneViewer · WebGL fallback', () => {
+  it('renders the fallback image with descriptive alt text when WebGL is unavailable', () => {
+    vi.spyOn(webgl, 'isWebGLAvailable').mockReturnValue(false);
+
+    render(
+      <SceneViewer height="400px" fallbackImage="/microgpt-3d-tutorial/models/previews/test.png">
+        <mesh />
+      </SceneViewer>
+    );
+
+    const img = screen.getByRole('img');
+    expect(img).toHaveAttribute('src', '/microgpt-3d-tutorial/models/previews/test.png');
+    expect(img).toHaveAttribute('alt', expect.stringMatching(/static preview/i));
+  });
+});
