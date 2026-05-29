@@ -35,8 +35,9 @@ const LIGHT_PALETTE: Palette = {
   accent: '#fb923c',
   accentStrength: 1.0,
   // Dark cells against a light bg — high values opaque/dark, low values
-  // semi-transparent dark — so density reads as contrast, not glow.
-  cellColorFn: (v: number) => `rgba(40, 40, 60, ${0.15 + v * 0.85})`,
+  // still visibly inked (alpha floored at 0.35) so even the dimmest cell
+  // leaves a faint dark mark rather than vanishing into the near-white stage.
+  cellColorFn: (v: number) => `rgba(40, 40, 60, ${0.35 + v * 0.65})`,
   lighting: {
     ambient: 0.6,
     hemi: 0.8,
@@ -61,9 +62,15 @@ const DARK_PALETTE: Palette = {
   gridColors: ['#440066', '#330055'] as const,
   accent: '#00ffff',
   accentStrength: 2.5,
+  // Floor at a visible navy-cyan so v≈0 cells still register against the
+  // dark stage; ceiling stays a bright neon cyan so v controls brightness
+  // as a gradient rather than as visibility. v=0 → rgb(0,80,120),
+  // v=0.5 → rgb(40,167,187), v=1 → rgb(80,255,255).
   cellColorFn: (v: number) => {
-    const c = Math.round(v * 255);
-    return `rgb(0, ${c}, ${c})`;
+    const r = Math.round(v * 80);
+    const g = Math.round(80 + v * 175);
+    const b = Math.round(120 + v * 135);
+    return `rgb(${r}, ${g}, ${b})`;
   },
   lighting: {
     ambient: 0.25,
@@ -120,6 +127,7 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, 1, 0]}
           label="x"
+          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
@@ -127,6 +135,7 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, -1, 0]}
           label="y"
+          reactiveColor
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}

@@ -2,8 +2,8 @@
 
 import { useGLTF, Html } from '@react-three/drei';
 import { useMemo, useRef, type CSSProperties } from 'react';
-import { useFrame } from '@react-three/fiber';
-import type { Group, Object3D } from 'three';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Color, type Group, type Object3D } from 'three';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/node.glb';
 
@@ -25,7 +25,7 @@ interface MeshLike {
   isMesh?: boolean;
   material?: {
     name?: string;
-    color?: { set: (c: string) => void };
+    color?: { set: (c: string) => void; r?: number; g?: number; b?: number };
     emissive?: { r?: number; g?: number; b?: number; set?: (c: string) => void };
     emissiveIntensity?: number;
   };
@@ -56,7 +56,18 @@ export interface NodeBlockProps {
    *  When omitted, defaults to 1.0 (or 0.5 when `glow` is active, since the
    *  glow animation drives intensity downward from a baseline). */
   accentStrength?: number;
+  /** When true, the body color is NOT applied on mount. Instead, it lerps
+   *  from the .glb's baked material color toward `color` as the user rotates
+   *  the scene via OrbitControls. Provides a tactile "wakes up when touched"
+   *  feel. Rotation accumulates monotonically and clamps at π radians, so
+   *  the color holds when the user stops rotating (no decay). */
+  reactiveColor?: boolean;
 }
+
+// Baseline body color used when reactiveColor=true — matches the .glb's
+// matte-black baked body so the lerp starts from the unadulterated cyberpunk
+// look and shifts toward the prop `color` only as the user rotates.
+const REACTIVE_BASELINE_HEX = '#0a0a0a';
 
 export function NodeBlock({
   position,
@@ -65,6 +76,7 @@ export function NodeBlock({
   glow = false,
   accentColor,
   accentStrength,
+  reactiveColor = false,
 }: NodeBlockProps) {
   const gltf = useGLTF(URL);
   // Clone so each instance is independent (material edits won't bleed between instances)
@@ -85,10 +97,14 @@ export function NodeBlock({
         }
         return;
       }
+      // When reactiveColor is on, skip the immediate body recolor so the
+      // .glb's baked matte-black stays put — useFrame below will drive the
+      // color via lerp once the user rotates.
+      if (reactiveColor) return;
       mat.color?.set(color);
     });
     return cloned;
-  }, [gltf.scene, color, glow, accentColor, accentStrength]);
+  }, [gltf.scene, color, glow, accentColor, accentStrength, reactiveColor]);
 
   // Subtle emissive pulse when glow is on — gives the block a "live" feel
   // without distracting motion. No-op when glow is false. Only touches the
@@ -102,6 +118,58 @@ export function NodeBlock({
       if (mesh.material.emissiveIntensity !== undefined) {
         mesh.material.emissiveIntensity = 0.4 + 0.2 * Math.sin(clock.elapsedTime * 2);
       }
+    });
+  });
+
+  // Reactive-color hook: lerp body color from matte black toward `color`,
+  // driven by accumulated camera rotation. Refs (not state) so we avoid
+  // re-renders on every frame. Conditionally a no-op when reactiveColor=false.
+  const { camera } = useThree();
+  const prevAzimuthRef = useRef<number | null>(null);
+  const prevPolarRef = useRef<number | null>(null);
+  const rotationAccumRef = useRef(0);
+  const baselineColor = useMemo(() => new Color(REACTIVE_BASELINE_HEX), []);
+  const targetColor = useMemo(() => new Color(color), [color]);
+  const scratchColor = useMemo(() => new Color(), []);
+
+  useFrame(() => {
+    if (!reactiveColor || !groupRef.current || !camera) return;
+
+    // Derive camera polar/azimuth assuming OrbitControls keeps looking at the
+    // origin (which is true for the gallery's default SceneViewer setup).
+    const v = camera.position;
+    const r = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) || 1;
+    const azimuth = Math.atan2(v.x, v.z);
+    const polar = Math.acos(Math.max(-1, Math.min(1, v.y / r)));
+
+    // First frame: seed prev values and skip — avoids a spurious "jump"
+    // on the very first tick where prev=0 would make the delta huge.
+    if (prevAzimuthRef.current === null || prevPolarRef.current === null) {
+      prevAzimuthRef.current = azimuth;
+      prevPolarRef.current = polar;
+      return;
+    }
+
+    // Wrap-safe azimuth delta (azimuth is in [-π, π], so a jump from ~π to ~-π
+    // is really a tiny step, not a full revolution). Use the shorter arc.
+    let dAz = Math.abs(azimuth - prevAzimuthRef.current);
+    if (dAz > Math.PI) dAz = 2 * Math.PI - dAz;
+    const dPol = Math.abs(polar - prevPolarRef.current);
+
+    rotationAccumRef.current = Math.min(rotationAccumRef.current + dAz + dPol, Math.PI);
+    prevAzimuthRef.current = azimuth;
+    prevPolarRef.current = polar;
+
+    // Map [0, π] → [0, 1]; ~half a turn of rotation fully shifts the color.
+    const t = Math.min(rotationAccumRef.current / Math.PI, 1);
+    scratchColor.copy(baselineColor).lerp(targetColor, t);
+    const hex = `#${scratchColor.getHexString()}`;
+
+    groupRef.current.traverse((object: Object3D) => {
+      const mesh = object as unknown as MeshLike;
+      if (!mesh.isMesh || !mesh.material) return;
+      if (isEmissiveAccent(mesh.material)) return;
+      mesh.material.color?.set(hex);
     });
   });
 
