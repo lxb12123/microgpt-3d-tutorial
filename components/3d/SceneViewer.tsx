@@ -50,21 +50,19 @@ export function SceneViewer({ height, fallbackImage, children, hud }: SceneViewe
       {hud ? <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
       <SceneErrorBoundary>
         <Canvas camera={{ position: [3, 3, 3], fov: 50 }}>
-          {/* Multi-source rig so geometry reads against both themes:
-              - hemisphereLight: soft sky/ground fill
-              - ambientLight: small flat baseline
-              - key directional (front-top-right)
-              - rim directional (back-top-left) for silhouette pop
-              NOTE: drei's <Environment preset="city" /> would give nicer PBR
-              reflections but in drei v10 presets are fetched from a remote
-              CDN at runtime (githack), which breaks static-export pages and
-              adds a network dependency. Omitting it here; the multi-light
-              rig already reads much better than the previous single
-              ambient + directional. */}
-          <hemisphereLight args={['#ffffff', '#404060', 0.5]} />
-          <ambientLight intensity={0.25} />
-          <directionalLight position={[5, 8, 5]} intensity={1.1} castShadow={false} />
-          <directionalLight position={[-4, 3, -4]} intensity={0.4} />
+          {/* Cyberpunk-tinted multi-source rig:
+              - hemisphereLight: cool blue sky / near-black ground fill
+              - ambientLight: small flat baseline (kept low so blacks stay black)
+              - key directional (front-top-right): magenta-tinted, drives
+                colour on the lit side of matte black bodies
+              - rim directional (back-top-left): cyan-tinted, traces a neon
+                halo on the back edges; complements the .glb's cyan emissives
+              Tuned darker overall vs. the previous neutral rig so the
+              emissive accents read as "glowing" rather than getting drowned. */}
+          <hemisphereLight args={['#202840', '#0a0a1a', 0.3]} />
+          <ambientLight intensity={0.15} />
+          <directionalLight position={[5, 8, 5]} intensity={0.6} color={'#ffccff'} castShadow={false} />
+          <directionalLight position={[-4, 3, -4]} intensity={0.5} color={'#aaffff'} />
           <Suspense fallback={null}>{children}</Suspense>
           <OrbitControls makeDefault />
         </Canvas>
