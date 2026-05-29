@@ -21,15 +21,24 @@ interface Palette {
   accentStrength: number;
   cellColorFn: (v: number) => string;
   lighting: SceneLighting;
+  // Whether x/y NodeBlocks should lerp their body color with camera azimuth.
+  // Dark mode needs this for the slate↔dark-slate brightness wash that proves
+  // the angle-driven recolor works. Light mode uses a saturated body color
+  // (warm orange) where the same lerp would oscillate between bright orange
+  // and dark brown — distracting and off-spec for the static warm look.
+  reactiveColor: boolean;
 }
 
-// Light = Apple/Notion soft. Body color is a medium slate so silhouettes
-// read against the near-white stage. Accents shift to warm amber, since
-// cyan-on-white is harsh; the warm key + neutral fill flatter the matte.
+// Light = warm-orange aesthetic. The body of every NodeBlock / TokenCube is
+// painted in the same amber (#fb923c) as the cyan-equivalent accent, so the
+// whole cube reads as a saturated warm orange against the near-white stage
+// — the look the user signed off on before the isEmissiveAccent fix went in
+// and accidentally desaturated the bodies to slate. Arrows stay neutral
+// gray so they don't blur into the orange cube silhouettes.
 const LIGHT_PALETTE: Palette = {
   pageBg: '#f4f5f7',
   stageBg: '#fafafa',
-  body: '#52525b',
+  body: '#fb923c',
   arrowBody: '#71717a',
   gridColors: ['#d4d4d8', '#e4e4e7'] as const,
   accent: '#fb923c',
@@ -47,6 +56,7 @@ const LIGHT_PALETTE: Palette = {
     rim: 0.5,
     rimColor: '#fff7ed',
   },
+  reactiveColor: false,
 };
 
 // Dark = cyberpunk, but rig neutralized. Previous rig used a magenta-tinted
@@ -91,6 +101,7 @@ const DARK_PALETTE: Palette = {
     rim: 0.35,
     rimColor: '#ffffff',
   },
+  reactiveColor: true,
 };
 
 // next-themes returns `undefined` on initial SSR + first client render, then
@@ -142,7 +153,7 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, 1, 0]}
           label="x"
-          reactiveColor
+          reactiveColor={p.reactiveColor}
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
@@ -150,7 +161,7 @@ export function GalleryScene() {
         <NodeBlock
           position={[-3, -1, 0]}
           label="y"
-          reactiveColor
+          reactiveColor={p.reactiveColor}
           color={p.body}
           accentColor={p.accent}
           accentStrength={p.accentStrength}
