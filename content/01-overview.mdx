@@ -1,3 +1,45 @@
-# 01 · Overview
+# 01 · Overview: Data → Forward → Loss → Sample in 30 Seconds
 
-*Coming soon — built out in Phase 2 task D4.*
+## Theory
+
+A language model is four things in a trenchcoat: a tokenizer, a forward pass, a loss, and a sampler. Everything else — attention, MLPs, rotary embeddings, mixture-of-experts — is just a fancier forward pass.
+
+This whole lesson fits in one sentence:
+
+> The model reads a few characters, predicts a distribution over what should come next, and learns by comparing its prediction to the truth.
+
+Three views of that loop:
+
+- **Forward** — tokens flow left to right through one transformer block. Attention scores connect tokens to each other. The MLP block pulses on each position. The right end is a probability bar over the full vocabulary.
+- **Loss** — the model is asked to predict each next character. Where it's wrong, the corresponding input token turns red. Loss is just the negative log probability of the truth, averaged.
+- **Sample** — at the last position, draw one character from the model's distribution and append it to the input. Repeat to generate text.
+
+The 02 lesson zooms into the autograd that makes "learn from loss" possible. The 03 lesson zooms into the self-attention block. This one keeps the bird's-eye view.
+
+## Annotated Code
+
+The forward pass uses three helpers — `linear`, `softmax`, `rmsnorm` — and one big function `gpt()` that wires them up. The helpers live in `src/microgpt_annotated.py`, subsection `overview-pipeline-helpers`:
+
+```python
+def linear(x, w):
+    return [sum(wi * xi for wi, xi in zip(wo, x)) for wo in w]
+
+def softmax(logits):
+    max_val = max(val.data for val in logits)
+    exps = [(val - max_val).exp() for val in logits]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+def rmsnorm(x):
+    ms = sum(xi * xi for xi in x) / len(x)
+    scale = (ms + 1e-5) ** -0.5
+    return [xi * scale for xi in x]
+```
+
+The training step (subsection `overview-training-step`) is just: forward → compute loss against the truth → `loss.backward()` → SGD step on every parameter. The TypeScript port in `src/inference/{model,value,weights}.ts` implements the same forward path so this sandbox can run it live in your browser, on the actual ~10 KB weights checked into the repo.
+
+## Sandbox
+
+Type up to 10 characters (or pick a preset). Switch modes: **Forward** shows the live distribution over the vocabulary for the last position; **Loss** highlights mis-predicted input characters in red; **Sample** draws one character from the last-position distribution and appends it.
+
+<OverviewSandbox defaultText="anna" />
