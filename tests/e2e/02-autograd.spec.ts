@@ -10,7 +10,11 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await page.goto('/microgpt-3d-tutorial/02-autograd/');
 
     await expect(page.getByRole('heading', { name: /02.*autograd/i })).toBeVisible();
-    await expect(page.locator('canvas')).toBeVisible({ timeout: 10_000 });
+    // Sandboxes are wrapped in <LazyMount> (Phase 3 perf fix): the three.js
+    // chunk only mounts once the wrapper enters viewport. Scroll the bottom of
+    // the page into view to trigger it before asserting canvas.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
     // Wait for the sandbox to compute root value
     await expect(page.getByText(/root\s*=/i)).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(1_500);

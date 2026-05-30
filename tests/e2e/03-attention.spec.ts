@@ -10,7 +10,11 @@ for (const colorScheme of ['dark', 'light'] as const) {
     await page.goto('/microgpt-3d-tutorial/03-attention/');
 
     await expect(page.getByRole('heading', { name: /03.*attention/i })).toBeVisible();
-    await expect(page.locator('canvas')).toBeVisible({ timeout: 10_000 });
+    // Sandboxes are wrapped in <LazyMount> (Phase 3 perf fix): the three.js
+    // chunk only mounts once the wrapper enters viewport. Scroll the bottom of
+    // the page into view to trigger it before asserting canvas.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
     // ParamSlider renders the head control as an <input type="range"
     // aria-label="head">. Playwright's `getByLabel` matches the accessibility
     // name; the spec used `getByLabelText` (a Testing Library API) which
