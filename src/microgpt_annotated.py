@@ -44,6 +44,7 @@ print(f"vocab size: {vocab_size}")
 # This is the "micrograd" engine: add, mul, pow, log, exp, relu, and their transposes.
 
 # Let there be Autograd to recursively apply the chain rule through a computation graph
+# --- SUBSECTION: autograd-value-class ---
 class Value:
     __slots__ = ('data', 'grad', '_children', '_local_grads') # Python optimization for memory usage
 
@@ -87,6 +88,7 @@ class Value:
         for v in reversed(topo):
             for child, local_grad in zip(v._children, v._local_grads):
                 child.grad += local_grad * v.grad
+# --- END SUBSECTION ---
 
 # === Section 3: Parameter Initialization ===
 # Set model hyperparameters and build the state_dict: token embeddings (wte),
@@ -119,6 +121,7 @@ print(f"num params: {len(params)}")
 
 # Define the model architecture: a function mapping tokens and parameters to logits over what comes next
 # Follow GPT-2, blessed among the GPTs, with minor differences: layernorm -> rmsnorm, no biases, GeLU -> ReLU
+# --- SUBSECTION: overview-pipeline-helpers ---
 def linear(x, w):
     return [sum(wi * xi for wi, xi in zip(wo, x)) for wo in w]
 
@@ -132,7 +135,9 @@ def rmsnorm(x):
     ms = sum(xi * xi for xi in x) / len(x)
     scale = (ms + 1e-5) ** -0.5
     return [xi * scale for xi in x]
+# --- END SUBSECTION ---
 
+# --- SUBSECTION: attention-multihead ---
 def gpt(token_id, pos_id, keys, values):
     tok_emb = state_dict['wte'][token_id] # token embedding
     pos_emb = state_dict['wpe'][pos_id] # position embedding
@@ -170,6 +175,7 @@ def gpt(token_id, pos_id, keys, values):
 
     logits = linear(x, state_dict['lm_head'])
     return logits
+# --- END SUBSECTION ---
 
 # === Section 5: Training Loop ===
 # Adam optimizer with linear learning-rate decay trains the model for num_steps
@@ -184,6 +190,7 @@ v = [0.0] * len(params) # second moment buffer
 
 # Repeat in sequence
 num_steps = 1000 # number of training steps
+# --- SUBSECTION: overview-training-step ---
 for step in range(num_steps):
 
     # Take single document, tokenize it, surround it with BOS special token on both sides
@@ -216,6 +223,7 @@ for step in range(num_steps):
         p.grad = 0
 
     print(f"step {step+1:4d} / {num_steps:4d} | loss {loss.data:.4f}", end='\r')
+# --- END SUBSECTION ---
 
 # === Section 6: Sampling / Inference ===
 # After training, run the model autoregressively: seed with BOS, feed each
