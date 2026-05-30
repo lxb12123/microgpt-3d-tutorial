@@ -1,3 +1,54 @@
-# 03 · Attention
+# 03 · Attention: How Tokens Talk to Each Other
 
-*Coming soon — built out in Phase 2 task C5.*
+## Theory
+
+Self-attention asks, for each query token `q_i`, "how much should I listen to each prior token's value `v_j`?" The recipe:
+
+1. Project every token into three vectors: **query** `q`, **key** `k`, **value** `v`. Each is a learned linear map of the token's embedding.
+2. Score the query against every key: `score[i][j] = (q_i · k_j) / sqrt(d_head)`. The `sqrt` keeps the variance stable as the head dimension grows.
+3. Apply a **causal mask** — token `i` can only see tokens `j ≤ i`. Softmax the (masked) row so the attention weights sum to 1.
+4. Take the weighted sum of the value vectors: `output_i = Σ_j softmax(score)[i][j] * v_j`.
+
+The whole layer does this **per head** in parallel; each head gets its own slice of the embedding and learns its own query/key/value projections. The per-head outputs are concatenated and projected back to the embedding dimension via `W_o`.
+
+The sandbox below stacks all six tensors (Q, K, scores, softmax, V, head output) for one head you choose. Click any score cell to see its dot-product breakdown.
+
+## Annotated Code
+
+The attention block lives in `src/microgpt_annotated.py`, subsection `attention-multihead`:
+
+```python
+def gpt(token_id, pos_id, keys, values):
+    # ...embedding + rmsnorm above this point...
+    for li in range(n_layer):
+        x_residual = x
+        x = rmsnorm(x)
+        q = linear(x, state_dict[f'layer{li}.attn_wq'])
+        k = linear(x, state_dict[f'layer{li}.attn_wk'])
+        v = linear(x, state_dict[f'layer{li}.attn_wv'])
+        keys[li].append(k)
+        values[li].append(v)
+        x_attn = []
+        for h in range(n_head):
+            hs = h * head_dim
+            q_h = q[hs:hs+head_dim]
+            k_h = [ki[hs:hs+head_dim] for ki in keys[li]]
+            v_h = [vi[hs:hs+head_dim] for vi in values[li]]
+            attn_logits = [sum(q_h[j] * k_h[t][j] for j in range(head_dim)) / head_dim**0.5
+                           for t in range(len(k_h))]
+            attn_weights = softmax(attn_logits)
+            head_out = [sum(attn_weights[t] * v_h[t][j] for t in range(len(v_h)))
+                        for j in range(head_dim)]
+            x_attn.extend(head_out)
+        x = linear(x_attn, state_dict[f'layer{li}.attn_wo'])
+        x = [a + b for a, b in zip(x, x_residual)]
+        # ...MLP block follows...
+```
+
+Notice the causal structure is built into the call signature: `gpt()` is called once per position, with the KV cache (`keys`, `values`) growing one row per call. The TypeScript port in `src/inference/model.ts` instead computes the whole `T`-length sequence in one call with an explicit `j ≤ i` loop — same math, different control flow.
+
+## Sandbox
+
+Pick a sentence (≤6 chars) and a head (0–3). Scrub the timeline to watch the layers fade in. Click a score cell to see how it was computed.
+
+<AttentionSandbox defaultText="anna" />
