@@ -32,7 +32,7 @@ export interface SceneViewerProps {
 }
 
 // Default lighting (cyberpunk-tinted, used when caller doesn't pass a rig).
-// Kept identical to the pre-prop values so existing callers (e.g. sandbox-check)
+// Kept identical to the pre-prop values so callers that omit `lighting`
 // look the same without any change.
 const DEFAULT_LIGHTING: SceneLighting = {
   ambient: 0.15,
