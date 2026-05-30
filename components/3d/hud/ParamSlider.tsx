@@ -19,6 +19,7 @@ export function ParamSlider({ label, min, max, step = 1, value, onChange }: Para
         max={max}
         step={step}
         value={value}
+        aria-label={label}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{value}</span>

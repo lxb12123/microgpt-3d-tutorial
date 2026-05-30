@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
@@ -8,6 +9,18 @@ import { ModeSelector, PlayPauseScrubber, getSandboxPalette } from '@/components
 import { parse, type AstNode } from '@/src/inference/parser';
 import { buildDag } from './buildDag';
 import { computeNodeActivations, type Phase } from './scheduler';
+
+// Match the resolved Nextra theme without SSR hydration mismatch. Same pattern
+// the primitives gallery uses: server snapshot pins to 'dark', client snapshot
+// reads next-themes after mount. Sandboxes thus follow the page chrome — a
+// hardcoded scheme makes the canvas clash with the rest of the page.
+const noopSubscribe = () => () => {};
+function useResolvedScheme(): 'light' | 'dark' {
+  const { resolvedTheme } = useTheme();
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  if (!mounted) return 'dark';
+  return resolvedTheme === 'light' ? 'light' : 'dark';
+}
 
 export interface AutogradSandboxProps {
   defaultExpression: string;
@@ -44,7 +57,8 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
   const [vars, setVars] = useState(defaultVariables);
   const [phase, setPhase] = useState<Phase>('fwd');
   const [t, setT] = useState(1); // start fully populated for first paint
-  const palette = getSandboxPalette('autograd', 'dark');
+  const scheme = useResolvedScheme();
+  const palette = getSandboxPalette('autograd', scheme);
 
   // Auto-add a 0-valued slot for any new identifier the user types. Done as a
   // pure derivation (no setState-in-effect) so the lint rule against cascading
@@ -134,14 +148,19 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
     <SceneViewer height="520px" fallbackImage="/microgpt-3d-tutorial/models/previews/autograd.png" hud={hud} bgColor={palette.bg}>
       {dag!.nodes.map((n) => {
         const a = activations[n.id] ?? 0;
-        // Lerp body color toward palette.accent based on activation
-        const color = a > 0.5 ? palette.accent : palette.body;
+        // Body color stays at palette.body. Activation is signaled by `glow`
+        // (emissive accent pulse) and by the lit arrows feeding the node — NOT
+        // by swapping body to palette.accent, which would (and previously did)
+        // wipe out the body color whenever the scrubber sits at t=1, because
+        // every node is then "fully active".
         return (
           <NodeBlock
             key={n.id}
             position={positions[n.id]}
             label={`${n.label}\n${n.value.data.toFixed(2)} | g=${n.value.grad.toFixed(2)}`}
-            color={color}
+            color={palette.body}
+            accentColor={palette.accent}
+            accentStrength={a > 0.5 ? 1.0 : 0.4}
             glow={a > 0.8}
           />
         );
