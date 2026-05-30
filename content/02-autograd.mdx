@@ -1,3 +1,64 @@
-# 02 · Autograd
+# 02 · Autograd: How Gradients Flow Through a Tiny DAG
 
-*Coming soon — built out in Phase 2 task B5.*
+## Theory
+
+A neural network is a function composed of many small ops: add, multiply, exponentiate, ReLU. To train it, we need the gradient of the loss with respect to every parameter. The trick that makes this practical is **reverse-mode automatic differentiation**.
+
+Karpathy's `Value` class implements it in about 25 lines. Each `Value` records:
+
+- its scalar `data`,
+- the list of `_children` it was built from,
+- the local gradient `d(self) / d(child_i)` for each child.
+
+When you call `loss.backward()`:
+
+1. Traverse the graph in topological order (children before parents).
+2. Initialize `loss.grad = 1`.
+3. Walk the topo list in reverse and, for each node `v`, distribute `v.grad` into each child via the chain rule: `child.grad += local_grad_i * v.grad`.
+
+That's it. No symbolic math, no static graph — the graph is built on the fly as you do the forward pass, and `backward()` just plays it in reverse.
+
+The 3D sandbox below lets you type an expression, see the live DAG that the `Value` ops build, then play either the forward pulse (data flowing from leaves to root) or the backward pulse (gradients flowing root to leaves). Drag a slider to change a leaf's value and watch the whole graph recompute.
+
+## Annotated Code
+
+The `Value` class lives in `src/microgpt_annotated.py`, in the subsection marked `autograd-value-class`:
+
+```python
+class Value:
+    def __init__(self, data, _children=(), _local_grads=()):
+        self.data = data
+        self.grad = 0
+        self._children = _children
+        self._local_grads = _local_grads
+
+    def __add__(self, other):
+        return Value(self.data + other.data, (self, other), (1, 1))
+
+    def __mul__(self, other):
+        return Value(self.data * other.data, (self, other), (other.data, self.data))
+
+    # ... pow, exp, log, relu identical in spirit ...
+
+    def backward(self):
+        topo = []
+        visited = set()
+        def build(v):
+            if v not in visited:
+                visited.add(v)
+                for c in v._children: build(c)
+                topo.append(v)
+        build(self)
+        self.grad = 1
+        for v in reversed(topo):
+            for child, local_grad in zip(v._children, v._local_grads):
+                child.grad += local_grad * v.grad
+```
+
+The TypeScript port in `src/inference/value.ts` mirrors this one-for-one — same field names, same op semantics — so the equivalence tests can introspect both sides.
+
+## Sandbox
+
+Type any expression using `+ - * / **`, `relu(x)`, `exp(x)`, `log(x)`, single-letter variables, and parentheses. Hit a preset for a starting point. Drag sliders to change variable values. Scrub the timeline to step through the forward (or backward) pulse.
+
+<AutogradSandbox defaultExpression="(a + b) * c" defaultVariables={{ a: 2, b: -3, c: 10 }} />

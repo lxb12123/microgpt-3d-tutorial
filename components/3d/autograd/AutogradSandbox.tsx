@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
@@ -46,29 +46,26 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
   const [t, setT] = useState(1); // start fully populated for first paint
   const palette = getSandboxPalette('autograd', 'dark');
 
-  // Auto-add slider for any new identifier the user types. Run in an effect so
-  // state updates happen after render — calling setVars() during render would
-  // either log a warning or trigger an infinite loop.
+  // Auto-add a 0-valued slot for any new identifier the user types. Done as a
+  // pure derivation (no setState-in-effect) so the lint rule against cascading
+  // renders stays happy. `effectiveVars` is what buildDag and the sliders read;
+  // `setVars` writes back the merged map so the value sticks across edits.
   const varNames = useMemo(() => collectVarNames(expr), [expr]);
-  useEffect(() => {
-    const missing = varNames.filter((n) => !(n in vars));
-    if (missing.length === 0) return;
-    setVars((prev) => {
-      const next = { ...prev };
-      for (const m of missing) if (!(m in next)) next[m] = 0;
-      return next;
-    });
+  const effectiveVars = useMemo(() => {
+    const merged: Record<string, number> = { ...vars };
+    for (const name of varNames) if (!(name in merged)) merged[name] = 0;
+    return merged;
   }, [varNames, vars]);
 
   const built = useMemo(() => {
     try {
-      const dag = buildDag(parse(expr), vars);
+      const dag = buildDag(parse(expr), effectiveVars);
       if (phase === 'bwd') dag.root.backward();
       return { dag, error: null as string | null };
     } catch (e) {
       return { dag: null, error: (e as Error).message };
     }
-  }, [expr, vars, phase]);
+  }, [expr, effectiveVars, phase]);
 
   if (built.error) {
     return (
@@ -114,11 +111,11 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
             min={-10}
             max={10}
             step={0.1}
-            value={vars[name] ?? 0}
+            value={effectiveVars[name] ?? 0}
             aria-label={name}
-            onChange={(e) => setVars({ ...vars, [name]: Number(e.target.value) })}
+            onChange={(e) => setVars({ ...effectiveVars, [name]: Number(e.target.value) })}
           />
-          <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{(vars[name] ?? 0).toFixed(1)}</span>
+          <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{(effectiveVars[name] ?? 0).toFixed(1)}</span>
         </label>
       ))}
       <ModeSelector

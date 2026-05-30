@@ -72,10 +72,6 @@ export function buildDag(ast: AstNode, vars: Record<string, number>): Dag {
         v = l.value.pow(r.value.data);
         break;
       }
-      default: {
-        const _exhaustive: never = n.op;
-        throw new Error(`buildDag: unknown binop ${_exhaustive as string}`);
-      }
     }
     const node: DagNode = { id: newId(), op: n.op, label: n.op, value: v };
     nodes.push(node);
