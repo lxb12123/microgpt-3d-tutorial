@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "check-assets": "node scripts/check-assets.mjs",
     "e2e:ci": "playwright test",
-    "analyze": "ANALYZE=true next build",
+    "analyze": "ANALYZE=true next build --webpack",
     "bench": "tsx scripts/bench-inference.ts"
   },
   "engines": {
@@ -32,6 +32,7 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.6",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/jest-dom": "^6.9.1",
