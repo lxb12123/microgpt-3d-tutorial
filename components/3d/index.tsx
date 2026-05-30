@@ -26,6 +26,11 @@ const OverviewSandboxImpl = dynamic(
   { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
 );
 
+const HomeHeroImpl = dynamic(
+  () => import('./HomeHero').then((m) => m.HomeHero),
+  { ssr: false, loading: () => <p>Loading 3D hero…</p> },
+);
+
 export function AutogradSandbox(props: AutogradSandboxProps) {
   return <LazyMount><AutogradSandboxImpl {...props} /></LazyMount>;
 }
@@ -36,4 +41,14 @@ export function AttentionSandbox(props: AttentionSandboxProps) {
 
 export function OverviewSandbox(props: OverviewSandboxProps) {
   return <LazyMount><OverviewSandboxImpl {...props} /></LazyMount>;
+}
+
+// Homepage hero: a compact gallery of all four primitives (TokenCubes,
+// NodeBlocks, ConnectorArrows, MatrixGrid) on a theme-adaptive stage. Wrapped
+// in LazyMount so the three.js chunk only fetches once the hero scrolls into
+// view — for the home route that's effectively at first paint (it's the first
+// element), but the gate keeps the chunk off the critical path for any other
+// page that ever embeds this.
+export function HomeHero() {
+  return <LazyMount minHeight={440}><HomeHeroImpl /></LazyMount>;
 }
