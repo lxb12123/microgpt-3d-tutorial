@@ -33,6 +33,16 @@ export interface GptOptions {
 export interface GptCaptures {
   /** Per-layer per-head per-query causal-softmax attention weights: [layer][head][i][j], j<=i. */
   attention_scores?: number[][][][];
+  /** Alias of attention_scores; provided so spec §6 wording matches. */
+  attention_softmax?: number[][][][];
+  /** [layer][head][t][head_dim] — Q vector per head per query position. */
+  q_per_head?: number[][][][];
+  /** [layer][head][t][head_dim] — same shape, K side. */
+  k_per_head?: number[][][][];
+  /** [layer][head][t][head_dim] — same shape, V side. */
+  v_per_head?: number[][][][];
+  /** [layer][head][t][head_dim] — weighted-sum output per head, before the wo projection. */
+  head_output?: number[][][][];
   /** Per-layer MLP activations after fc1 but before ReLU: [layer][t][4*n_embd]. */
   mlp_pre_relu?: number[][][];
   /** Final logits as plain numbers: [T][vocab_size]. */
@@ -149,6 +159,10 @@ export function gpt(
   // Accumulators for per-layer captures.
   const attnScoresAll: number[][][][] = [];
   const mlpPreReluAll: number[][][] = [];
+  const qPerHeadAll: number[][][][] = [];
+  const kPerHeadAll: number[][][][] = [];
+  const vPerHeadAll: number[][][][] = [];
+  const headOutputAll: number[][][][] = [];
 
   for (let layer = 0; layer < N_LAYER; layer++) {
     // === 1) Multi-head self-attention block ===
@@ -165,11 +179,34 @@ export function gpt(
     const k: Value[][] = xNorm.map((row) => linear(row, wk));
     const v: Value[][] = xNorm.map((row) => linear(row, wv));
 
+    // Per-head slice snapshots: [head][t][head_dim]. Captured as plain numbers
+    // (the autograd graph still lives on q/k/v themselves).
+    const qHeadAll: number[][][] = new Array(N_HEAD);
+    const kHeadAll: number[][][] = new Array(N_HEAD);
+    const vHeadAll: number[][][] = new Array(N_HEAD);
+    for (let h = 0; h < N_HEAD; h++) {
+      qHeadAll[h] = new Array(T);
+      kHeadAll[h] = new Array(T);
+      vHeadAll[h] = new Array(T);
+      const hs = h * HEAD_DIM;
+      for (let t = 0; t < T; t++) {
+        qHeadAll[h][t] = q[t].slice(hs, hs + HEAD_DIM).map((vv) => vv.data);
+        kHeadAll[h][t] = k[t].slice(hs, hs + HEAD_DIM).map((vv) => vv.data);
+        vHeadAll[h][t] = v[t].slice(hs, hs + HEAD_DIM).map((vv) => vv.data);
+      }
+    }
+
     // For each query position i, attend over keys/values at positions <= i
     // (causal mask), separately per head, then concat heads back to N_EMBD.
     const attnOutPreProj: Value[][] = new Array(T);
     const layerScores: number[][][] = new Array(N_HEAD);
-    for (let h = 0; h < N_HEAD; h++) layerScores[h] = new Array(T);
+    // Per-head pre-projection output: [head][t][head_dim].
+    const headOut: number[][][] = new Array(N_HEAD);
+    for (let h = 0; h < N_HEAD; h++) {
+      layerScores[h] = new Array(T);
+      headOut[h] = new Array(T);
+      for (let t = 0; t < T; t++) headOut[h][t] = new Array(HEAD_DIM);
+    }
 
     const invSqrtHead = 1 / Math.sqrt(HEAD_DIM);
 
@@ -198,11 +235,16 @@ export function gpt(
             acc = acc.add(attnWeights[t].mul(v[t][hs + d]));
           }
           xAttnRow[hs + d] = acc;
+          headOut[h][i][d] = acc.data;
         }
       }
       attnOutPreProj[i] = xAttnRow;
     }
     attnScoresAll.push(layerScores);
+    qPerHeadAll.push(qHeadAll);
+    kPerHeadAll.push(kHeadAll);
+    vPerHeadAll.push(vHeadAll);
+    headOutputAll.push(headOut);
 
     // Output projection + residual.
     const attnOut: Value[][] = attnOutPreProj.map((row) => linear(row, wo));
@@ -240,6 +282,21 @@ export function gpt(
 
   if (captureSet.has('attention_scores')) {
     captures.attention_scores = attnScoresAll;
+  }
+  if (captureSet.has('attention_softmax')) {
+    captures.attention_softmax = attnScoresAll;
+  }
+  if (captureSet.has('q_per_head')) {
+    captures.q_per_head = qPerHeadAll;
+  }
+  if (captureSet.has('k_per_head')) {
+    captures.k_per_head = kPerHeadAll;
+  }
+  if (captureSet.has('v_per_head')) {
+    captures.v_per_head = vPerHeadAll;
+  }
+  if (captureSet.has('head_output')) {
+    captures.head_output = headOutputAll;
   }
   if (captureSet.has('mlp_pre_relu')) {
     captures.mlp_pre_relu = mlpPreReluAll;
