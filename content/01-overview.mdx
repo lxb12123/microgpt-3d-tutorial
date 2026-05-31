@@ -8,11 +8,22 @@ This whole lesson fits in one sentence:
 
 > The model reads a few characters, predicts a distribution over what should come next, and learns by comparing its prediction to the truth.
 
-Three views of that loop:
+Three views of that loop — each is a mode you can drive in the sandbox below. The clips show the live scene orbiting:
 
-- **Forward** — tokens flow left to right through one transformer block. Attention scores connect tokens to each other. The MLP block pulses on each position. The right end is a probability bar over the full vocabulary.
-- **Loss** — the model is asked to predict each next character. Where it's wrong, the corresponding input token turns red. Loss is just the negative log probability of the truth, averaged.
-- **Sample** — at the last position, draw one character from the model's distribution and append it to the input. Repeat to generate text.
+**Forward** — tokens flow left to right through one transformer block. Attention scores connect tokens to each other. The MLP block pulses on each position. The right end is a probability bar over the full vocabulary.
+
+<img src="/microgpt-3d-tutorial/diagrams/overview-forward-light.gif" alt="Forward pass: token cubes feeding a transformer block into a probability bar, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-forward-dark.gif" alt="Forward pass: token cubes feeding a transformer block into a probability bar, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+
+**Loss** — the model is asked to predict each next character. Where it's wrong, the corresponding input token turns red. Loss is just the negative log probability of the truth, averaged.
+
+<img src="/microgpt-3d-tutorial/diagrams/overview-loss-light.gif" alt="Loss view: mis-predicted input tokens highlighted, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-loss-dark.gif" alt="Loss view: mis-predicted input tokens highlighted, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+
+**Sample** — at the last position, draw one character from the model's distribution and append it to the input. Repeat to generate text.
+
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-light.gif" alt="Sample view: a character drawn from the last-position distribution flies back to the input row, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-dark.gif" alt="Sample view: a character drawn from the last-position distribution flies back to the input row, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
 The 02 lesson zooms into the autograd that makes "learn from loss" possible. The 03 lesson zooms into the self-attention block. This one keeps the bird's-eye view.
 
