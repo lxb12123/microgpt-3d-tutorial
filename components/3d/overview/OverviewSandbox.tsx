@@ -1,16 +1,22 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { TokenCube } from '@/components/3d/primitives/TokenCube';
 import { MatrixGrid } from '@/components/3d/primitives/MatrixGrid';
-import { ModeSelector, getSandboxPalette } from '@/components/3d/hud';
+import { ModeSelector, PlayPauseScrubber, getSandboxPalette } from '@/components/3d/hud';
 import { gpt } from '@/src/inference/model';
 import { loadWeights, type Weights } from '@/src/inference/weights';
 import { Tokenizer } from '@/src/inference/tokenizer';
-import { softmaxRow, computeLossMarks, sampleFromDistribution } from './modes';
+import {
+  softmaxRow,
+  computeLossMarks,
+  sampleFromDistribution,
+  computeOverviewSchedule,
+} from './modes';
 
 // Match the resolved Nextra theme without SSR hydration mismatch — same pattern
 // AutogradSandbox / AttentionSandbox use. Server snapshot pins to 'dark', client
@@ -55,6 +61,34 @@ const MODE_ITEMS = [
   { value: 'sample',  label: 'Sample' },
 ] as const;
 
+// One full timeline sweep takes this many seconds. The scrubber maps its
+// position onto [0, DURATION]; auto-play advances at 1×.
+const DURATION = 3.2;
+
+/** Drives the normalized clock `t ∈ [0,1]` from inside the R3F render loop.
+ *  Lives in the Canvas so it can call useFrame. When `playing`, it advances and
+ *  loops; the parent owns the `t` state so the scrubber stays in sync and can
+ *  seek. Kept as a render-loop ref write (no React state per frame) to avoid
+ *  re-rendering the whole scene 60×/s — the parent reads `tRef` in useFrame too. */
+function TimelineClock({
+  playing,
+  tRef,
+  onTick,
+}: {
+  playing: boolean;
+  tRef: React.MutableRefObject<number>;
+  onTick: (t: number) => void;
+}) {
+  useFrame((_, delta) => {
+    if (!playing) return;
+    let next = tRef.current + delta / DURATION;
+    if (next > 1) next = next - 1; // loop
+    tRef.current = next;
+    onTick(next);
+  });
+  return null;
+}
+
 export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const [text, setText] = useState(defaultText.slice(0, MAX_CHARS));
   const [mode, setMode] = useState<Mode>('forward');
@@ -63,10 +97,26 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   // "resample" affordance. Captured in state so deterministic render passes
   // (test, snapshot) don't flicker between values across re-renders.
   const [sampleSeed, setSampleSeed] = useState(0.5);
+  // Timeline: `t ∈ [0,1]` is the normalized clock the scene animates along.
+  // Auto-plays on mount and after any input/mode change so the reader always
+  // sees the pipeline fill in (direction + progress) without touching the HUD.
+  const [t, setT] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const tRef = useRef(0);
   const scheme = useResolvedScheme();
   const palette = getSandboxPalette('overview', scheme);
 
   useEffect(() => { loadWeights().then(setWeights).catch(() => setWeights(null)); }, []);
+
+  // Restart the timeline sweep from t=0 and resume playing. Called from the
+  // input/preset/mode handlers (not an effect) so the new scene animates in
+  // rather than jumping to wherever the clock happened to be — and so we don't
+  // trip the no-synchronous-setState-in-effect rule.
+  const restartSweep = () => {
+    tRef.current = 0;
+    setT(0);
+    setPlaying(true);
+  };
 
   type Computed =
     | {
@@ -183,7 +233,25 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const handleSetMode = (next: Mode) => {
     setMode(next);
     if (next === 'sample') setSampleSeed(Math.random());
+    restartSweep();
   };
+
+  const handleSetText = (next: string) => {
+    setText(next.slice(0, MAX_CHARS));
+    restartSweep();
+  };
+
+  const handleResample = () => {
+    setSampleSeed(Math.random());
+    restartSweep();
+  };
+
+  // Animation schedule for the current clock position. Drives the left→right
+  // reveal: tokens light first, then the GPT block, then the probability bars
+  // grow — so the reader sees DATA FLOWING in a DIRECTION with visible PROGRESS.
+  const tokenCount = ok?.ids.length ?? 0;
+  const barCount = probsRow[0].length;
+  const schedule = computeOverviewSchedule(t, mode, tokenCount, barCount);
 
   const sampledChar =
     ok && ok.sampledIdx < tokenizer.charCount
@@ -197,20 +265,31 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
       <input
         value={text}
         maxLength={MAX_CHARS}
-        onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
+        onChange={(e) => handleSetText(e.target.value)}
         aria-label="text"
         style={{ fontFamily: 'monospace', padding: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid #444' }}
       />
       {PRESETS.map((p) => (
-        <button key={p} type="button" onClick={() => setText(p.slice(0, MAX_CHARS))}>{p}</button>
+        <button key={p} type="button" onClick={() => handleSetText(p)}>{p}</button>
       ))}
       <ModeSelector items={MODE_ITEMS} value={mode} onChange={handleSetMode} />
+      <PlayPauseScrubber
+        duration={DURATION}
+        position={t * DURATION}
+        onSeek={(secs) => {
+          const nt = secs / DURATION;
+          tRef.current = nt;
+          setT(nt);
+          setPlaying(false);
+        }}
+        onTogglePlay={setPlaying}
+      />
       {mode === 'sample' && ok && (
         <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12 }}>
           sampled: {sampledChar}{' '}
           <button
             type="button"
-            onClick={() => setSampleSeed(Math.random())}
+            onClick={handleResample}
             style={{ fontSize: 11, marginLeft: 4 }}
           >
             resample
@@ -240,58 +319,91 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
       {/* Decorative chassis backdrop */}
       <PipelineChassis position={[0, -0.8, 0]} />
 
+      {/* The render-loop clock: advances `t` while playing, loops at 1.0. */}
+      <TimelineClock playing={playing} tRef={tRef} onTick={setT} />
+
       {ok && (
         <>
-          {/* Left: input tokens */}
+          {/* Left: input tokens. Each pops in (scale + glow) as the left→right
+              wavefront reaches it — that reveal IS the "data flowing" signal.
+              In loss mode the red only blooms once the token is revealed. */}
           {ok.ids.map((id, i) => {
-            // In loss mode, paint the token whose prediction missed (position
-            // t with t < T-1) red. Other modes leave the body in palette.body
-            // and signal liveness via the accent ramp on cubes.
+            const act = schedule.tokenActivation[i] ?? 0;
             const lossMark = mode === 'loss' && i < ok.lossMarks.length ? ok.lossMarks[i] : null;
             const isWrong = lossMark === 'wrong';
-            const color = isWrong ? '#ef4444' : palette.body;
+            // Mis-predicted tokens go a saturated red once the reveal wavefront
+            // reaches them (act > 0.5), with a matching red underglow so the
+            // "this one is wrong" signal is unmistakable in both schemes. Now
+            // that TokenCube clones its material per instance, the per-cube body
+            // color actually sticks instead of bleeding across the whole row.
+            const wrongLit = isWrong && act > 0.5;
+            const color = wrongLit ? '#ef4444' : palette.body;
+            const accentColor = wrongLit ? '#ff2d2d' : palette.accent;
+            const accentStrength = wrongLit ? 1.4 : 0.2 + 0.7 * act;
             const ch = id === tokenizer.bosId ? '·' : tokenizer.vocab[id] ?? '·';
+            const scale = 0.55 + 0.45 * act;
             return (
-              <TokenCube
-                key={`in-${i}`}
-                position={[tokenStartX + i * tokenSpacing, 0, 0]}
-                char={ch}
-                color={color}
-                accentColor={palette.accent}
-                accentStrength={isWrong ? 1.0 : 0.4}
-              />
+              <group key={`in-${i}`} position={[tokenStartX + i * tokenSpacing, 0, 0]} scale={scale}>
+                <TokenCube
+                  position={[0, 0, 0]}
+                  char={ch}
+                  color={color}
+                  accentColor={accentColor}
+                  accentStrength={accentStrength}
+                />
+              </group>
             );
           })}
 
-          {/* Middle: schematic GPT block — small attention slice (one head). */}
-          <group position={[-0.5, 0.6, 0]}>
+          {/* Middle: schematic GPT block. Fades up after the tokens, so the
+              reader sees the data ARRIVE at the block, not sit there pre-lit. */}
+          <group position={[-0.5, 0.6, 0]} scale={0.6 + 0.4 * schedule.blockActivation}>
             <MatrixGrid
               rows={ATTN_SIZE}
               cols={ATTN_SIZE}
-              values={attnGrid}
+              values={attnGrid.map((row) => row.map((v) => v * schedule.blockActivation))}
               cellColorFn={attnColor}
             />
           </group>
 
-          {/* Right: probability bars over vocab (V1: flat MatrixGrid cells). */}
+          {/* Right: probability bars. Each cell's value is scaled by its own
+              activation so the bars visibly GROW left→right at the end of the
+              sweep — the model's prediction materializing. */}
           <group position={[2.0, 0.4, 0]}>
             <MatrixGrid
               rows={1}
               cols={probsRow[0].length}
-              values={probsRow}
+              values={[probsRow[0].map((v, c) => v * (schedule.barActivation[c] ?? 0))]}
               cellColorFn={probColor}
             />
           </group>
 
-          {/* Sample mode: highlight the sampled token above the bar grid. */}
-          {mode === 'sample' && ok.sampledIdx < PROB_CELLS && (
-            <TokenCube
-              position={[2.0 + ok.sampledIdx * 0.45, 1.0, 0]}
-              char={sampledChar}
-              color={palette.highlight}
-              accentColor={palette.accent}
-              accentStrength={1.0}
-            />
+          {/* Sample mode: the drawn character lifts off the bar and flies back
+              to the input row (append), tracing the generation loop. The
+              sampled vocab index can exceed PROB_CELLS (the bar only shows the
+              first 12 cells), so the lift-off X is clamped to the bar's visible
+              width rather than gating the whole cube away. */}
+          {mode === 'sample' && schedule.sampleProgress > 0 && (
+            (() => {
+              const sp = schedule.sampleProgress;
+              const barCol = Math.min(ok.sampledIdx, PROB_CELLS - 1);
+              const fromX = 2.0 + barCol * 0.45;
+              const fromY = 1.0;
+              const toX = tokenStartX + tokenCount * tokenSpacing;
+              const toY = 0;
+              const x = fromX + (toX - fromX) * sp;
+              // Arc upward at the midpoint for a "flying" feel.
+              const y = fromY + (toY - fromY) * sp + Math.sin(sp * Math.PI) * 0.8;
+              return (
+                <TokenCube
+                  position={[x, y, 0]}
+                  char={sampledChar}
+                  color={palette.highlight}
+                  accentColor={palette.accent}
+                  accentStrength={1.0}
+                />
+              );
+            })()
           )}
         </>
       )}

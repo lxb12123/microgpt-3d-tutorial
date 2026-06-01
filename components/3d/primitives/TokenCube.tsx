@@ -31,14 +31,17 @@ export interface TokenCubeProps {
   accentStrength?: number;
 }
 
+interface MaterialLike {
+  name?: string;
+  color?: { set: (c: string) => void };
+  emissive?: { r?: number; g?: number; b?: number; set?: (c: string) => void };
+  emissiveIntensity?: number;
+  clone?: () => MaterialLike;
+}
+
 interface MeshLike {
   isMesh?: boolean;
-  material?: {
-    name?: string;
-    color?: { set: (c: string) => void };
-    emissive?: { r?: number; g?: number; b?: number; set?: (c: string) => void };
-    emissiveIntensity?: number;
-  };
+  material?: MaterialLike;
 }
 
 // Skip the cyan emissive underglow bar (TokenCubeGlowMat) so the cyberpunk
@@ -68,7 +71,13 @@ export function TokenCube({
     cloned.traverse((obj: Object3D) => {
       const mesh = obj as unknown as MeshLike;
       if (!mesh.isMesh || !mesh.material) return;
-      const mat = mesh.material;
+      // Object3D.clone(true) deep-copies the node hierarchy but SHARES the
+      // materials by reference. Multiple TokenCube instances mounted from the
+      // same glb would then all mutate one shared material — the last cube
+      // rendered wins, so every cube ends up the same color (e.g. a whole token
+      // row turning gold/red at once). Clone the material per cube first.
+      const mat = mesh.material.clone ? mesh.material.clone() : mesh.material;
+      mesh.material = mat;
       if (isEmissiveAccent(mat)) {
         if (accentColor && mat.emissive?.set) mat.emissive.set(accentColor);
         if (accentStrength !== undefined && mat.emissiveIntensity !== undefined) {
