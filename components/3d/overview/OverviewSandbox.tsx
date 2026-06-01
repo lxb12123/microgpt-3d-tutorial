@@ -1,9 +1,9 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { Html } from '@react-three/drei';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { TokenCube } from '@/components/3d/primitives/TokenCube';
 import { MatrixGrid } from '@/components/3d/primitives/MatrixGrid';
@@ -30,18 +30,6 @@ function useResolvedScheme(): 'light' | 'dark' {
   return resolvedTheme === 'light' ? 'light' : 'dark';
 }
 
-const CHASSIS_URL = '/microgpt-3d-tutorial/models/overview/pipeline-chassis.glb';
-
-/** Static backdrop: the floor + three pylons authored in Blender. Rendered as a
- *  plain primitive — material colors come from the glb and read neutrally on
- *  both schemes. */
-function PipelineChassis({ position }: { position: [number, number, number] }) {
-  const gltf = useGLTF(CHASSIS_URL);
-  const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
-  return <primitive object={scene} position={position} />;
-}
-useGLTF.preload(CHASSIS_URL);
-
 export interface OverviewSandboxProps {
   defaultText: string;
 }
@@ -51,7 +39,7 @@ const MAX_CHARS = 10;
 // Width of the right-side probability bar (in vocab cells). Real vocab is ~27
 // chars + BOS; 12 cells is enough to communicate the "distribution over vocab"
 // idea without overflowing the scene horizontally.
-const PROB_CELLS = 12;
+const PROB_CELLS = 8;
 
 type Mode = 'forward' | 'loss' | 'sample';
 
@@ -60,6 +48,34 @@ const MODE_ITEMS = [
   { value: 'loss',    label: 'Loss' },
   { value: 'sample',  label: 'Sample' },
 ] as const;
+
+// Per-mode captions + tint so the three clips tell visibly different stories
+// rather than looking like the same pipeline three times. The caption rides
+// above the scene the whole sweep, naming what THIS mode is doing.
+const MODE_THEME: Record<Mode, { title: string; subtitle: string; tint: string }> = {
+  forward: { title: 'FORWARD', subtitle: 'tokens → block → next-token probabilities', tint: '#34d399' },
+  loss:    { title: 'LOSS',    subtitle: "compare each prediction to the truth — red = wrong", tint: '#ef4444' },
+  sample:  { title: 'SAMPLE',  subtitle: 'draw one token from the distribution, append it', tint: '#f59e0b' },
+};
+
+function captionStyle(tint: string): CSSProperties {
+  return {
+    color: tint,
+    font: '700 18px ui-monospace, monospace',
+    letterSpacing: '0.12em',
+    whiteSpace: 'nowrap',
+    textShadow: '0 0 6px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.8)',
+    userSelect: 'none',
+  };
+}
+
+const subCaptionStyle: CSSProperties = {
+  color: '#cbd5e1',
+  font: '500 11px ui-sans-serif, system-ui, sans-serif',
+  whiteSpace: 'nowrap',
+  textShadow: '0 0 5px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.85)',
+  userSelect: 'none',
+};
 
 // One full timeline sweep takes this many seconds. The scrubber maps its
 // position onto [0, DURATION]; auto-play advances at 1×.
@@ -304,10 +320,12 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
     </div>
   );
 
-  // Layout: input tokens row at x ∈ [-4, -1.5], attention grid centered at
-  // origin, probability bars at x ≈ +3.
-  const tokenSpacing = 0.6;
-  const tokenStartX = -4;
+  // Layout: a left→right pipeline. Tokens on the left, the GPT block in the
+  // middle, the probability bar on the right. Coordinates are kept compact
+  // (total span ~7 units) and the whole scene is wrapped in a scaled+shifted
+  // group below so it fits the near-front camera's narrower field of view.
+  const tokenSpacing = 0.5;
+  const tokenStartX = -3.6;
 
   return (
     <SceneViewer
@@ -315,15 +333,30 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
       fallbackImage="/microgpt-3d-tutorial/models/previews/overview.png"
       hud={hud}
       bgColor={palette.bg}
+      // Front-ish camera, raised enough to still see the tops of the flat grids
+      // (they lie in the XZ plane) but much more head-on than the old [3,3,3]
+      // isometric — the pipeline reads left→right across the frame instead of
+      // piling up down a steep diagonal.
+      cameraPosition={[0, 3.4, 8]}
+      cameraFov={42}
     >
-      {/* Decorative chassis backdrop */}
-      <PipelineChassis position={[0, -0.8, 0]} />
-
       {/* The render-loop clock: advances `t` while playing, loops at 1.0. */}
       <TimelineClock playing={playing} tRef={tRef} onTick={setT} />
 
       {ok && (
-        <>
+        <group scale={0.62} position={[-0.6, 0, 0]}>
+          {/* Stage caption, one centered block above the scene, so the three
+              modes read as distinct stories at a glance: a green pipeline for
+              forward, a red truth-check for loss, a gold draw for sample. Title
+              and subtitle live in ONE Html node (stacked) so they can't collide
+              the way two separately-anchored nodes did. */}
+          <Html position={[0, 2.4, 0]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <div style={captionStyle(MODE_THEME[mode].tint)}>{MODE_THEME[mode].title}</div>
+              <div style={subCaptionStyle}>{MODE_THEME[mode].subtitle}</div>
+            </div>
+          </Html>
+
           {/* Left: input tokens. Each pops in (scale + glow) as the left→right
               wavefront reaches it — that reveal IS the "data flowing" signal.
               In loss mode the red only blooms once the token is revealed. */}
@@ -369,7 +402,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
           {/* Right: probability bars. Each cell's value is scaled by its own
               activation so the bars visibly GROW left→right at the end of the
               sweep — the model's prediction materializing. */}
-          <group position={[2.0, 0.4, 0]}>
+          <group position={[1.7, 0.4, 0]}>
             <MatrixGrid
               rows={1}
               cols={probsRow[0].length}
@@ -387,7 +420,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
             (() => {
               const sp = schedule.sampleProgress;
               const barCol = Math.min(ok.sampledIdx, PROB_CELLS - 1);
-              const fromX = 2.0 + barCol * 0.45;
+              const fromX = 1.7 + barCol * 0.45;
               const fromY = 1.0;
               const toX = tokenStartX + tokenCount * tokenSpacing;
               const toY = 0;
@@ -405,7 +438,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
               );
             })()
           )}
-        </>
+        </group>
       )}
     </SceneViewer>
   );

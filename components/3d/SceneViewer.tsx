@@ -29,6 +29,13 @@ export interface SceneViewerProps {
   bgColor?: string;
   /** Optional lighting rig override. When omitted, uses the cyberpunk-neutral default below. */
   lighting?: SceneLighting;
+  /** Optional camera position [x,y,z]. Defaults to the 3/4 isometric [3,3,3].
+   *  The overview scene passes a near-front, slightly-raised camera so its
+   *  left→right token row, GPT block, and probability bar all read head-on
+   *  instead of foreshortened down a steep diagonal. */
+  cameraPosition?: [number, number, number];
+  /** Optional camera field-of-view. Defaults to 50. */
+  cameraFov?: number;
 }
 
 // Default lighting (cyberpunk-tinted, used when caller doesn't pass a rig).
@@ -64,6 +71,8 @@ export function SceneViewer({
   hud,
   bgColor,
   lighting = DEFAULT_LIGHTING,
+  cameraPosition = [3, 3, 3],
+  cameraFov = 50,
 }: SceneViewerProps) {
   const webglAvailable = useWebGLAvailable();
 
@@ -83,7 +92,7 @@ export function SceneViewer({
     <div style={{ width: '100%', height, position: 'relative' }}>
       {hud ? <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
       <SceneErrorBoundary>
-        <Canvas camera={{ position: [3, 3, 3], fov: 50 }}>
+        <Canvas camera={{ position: cameraPosition, fov: cameraFov }}>
           {/* Multi-source rig driven by the `lighting` prop. The default rig
               keeps the cyberpunk look (cool hemi + magenta key + cyan rim);
               callers can pass a softer warm rig for light-mode usage. The
