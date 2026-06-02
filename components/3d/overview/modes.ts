@@ -3,9 +3,8 @@
  * no React, no R3F — so they can be tested directly in jsdom.
  *
  * `softmaxRow` is the numerically-stable softmax over a single logit row
- * (subtract the row max before exponentiating). `computeLossMarks` walks per
- * position and reports whether the model's top-1 prediction matched the
- * provided truth id — used to paint mis-predicted tokens red in loss mode.
+ * (subtract the row max before exponentiating). `buildLossColumns` aligns each
+ * position's prediction to the true next character for loss mode.
  * `sampleFromDistribution` draws a single index from a probability row using
  * inverse-CDF sampling against a caller-provided uniform seed in [0,1] (the
  * sandbox passes Math.random() at draw time; tests pass deterministic seeds).
@@ -15,17 +14,6 @@ export function softmaxRow(logits: number[]): number[] {
   const exps = logits.map((v) => Math.exp(v - m));
   const sum = exps.reduce((a, b) => a + b, 0);
   return exps.map((e) => e / sum);
-}
-
-export function computeLossMarks(
-  logits: number[][],
-  truthIds: number[],
-): Array<'right' | 'wrong'> {
-  return logits.map((row, t) => {
-    let arg = 0;
-    for (let i = 1; i < row.length; i++) if (row[i] > row[arg]) arg = i;
-    return arg === truthIds[t] ? 'right' : 'wrong';
-  });
 }
 
 export function sampleFromDistribution(probs: number[], seed: number): number {
@@ -201,10 +189,14 @@ export function computeOverviewSchedule(
   let lossFocusCol = -1;
   let showAverage = 0;
   if (mode === 'loss') {
+    // The last input position has no next-token truth, so there are
+    // tokenCount-1 loss columns. Scale the lane against THAT count, or the
+    // reveal/focus overshoot past the columns and the callout drops out.
+    const colCount = Math.max(tokenCount - 1, 0);
     const lossT = (t - 0.55) / (0.82 - 0.55);
     const clamped = Math.min(Math.max(lossT, 0), 1);
-    lossRevealed = Math.round(clamped * tokenCount);
-    lossFocusCol = clamped <= 0 ? -1 : Math.min(tokenCount - 1, Math.floor(clamped * tokenCount));
+    lossRevealed = Math.round(clamped * colCount);
+    lossFocusCol = clamped <= 0 ? -1 : Math.min(colCount - 1, Math.floor(clamped * colCount));
     showAverage = ramp(t, 0.82);
   }
 

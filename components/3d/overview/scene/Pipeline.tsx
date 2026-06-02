@@ -21,12 +21,11 @@ export function barX(i: number) { return BAR_START_X + i * BAR_STEP; }
 
 /** Input character cubes, revealed left→right by `activation`. */
 export function InputRow({
-  chars, activation, palette, colorOverride,
+  chars, activation, palette,
 }: {
   chars: string[];
   activation: number[];
   palette: PaletteLike;
-  colorOverride?: (i: number) => string | undefined;
 }) {
   return (
     <>
@@ -39,7 +38,7 @@ export function InputRow({
             <TokenCube
               position={[0, 0, 0]}
               char={ch}
-              color={colorOverride?.(i) ?? palette.body}
+              color={palette.body}
               accentColor={palette.accent}
               accentStrength={0.2 + 0.7 * act}
               labelSize={labelSize}

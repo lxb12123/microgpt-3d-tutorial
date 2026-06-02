@@ -3,7 +3,6 @@ import {
   averageLoss,
   buildLossColumns,
   buildProbBars,
-  computeLossMarks,
   computeOverviewSchedule,
   sampleFromDistribution,
   softmaxRow,
@@ -14,21 +13,6 @@ describe('overview modes', () => {
     const probs = softmaxRow([1, 2, 3, 4]);
     const sum = probs.reduce((a, b) => a + b, 0);
     expect(sum).toBeCloseTo(1, 9);
-  });
-
-  it('computeLossMarks tags positions where argmax != truth as "wrong"', () => {
-    // Logits suggest top prediction at idx 0 for both positions; truth is idx 1.
-    const logits = [
-      [5, 1, 0],
-      [4, 2, 1],
-    ];
-    const marks = computeLossMarks(logits, [1, 1]);
-    expect(marks).toEqual(['wrong', 'wrong']);
-  });
-
-  it('computeLossMarks tags "right" when argmax == truth', () => {
-    const logits = [[1, 5, 0]];
-    expect(computeLossMarks(logits, [1])).toEqual(['right']);
   });
 
   it('sampleFromDistribution returns an in-range integer index', () => {
@@ -74,10 +58,14 @@ describe('computeOverviewSchedule', () => {
     expect(s.barActivation.every((v) => v === 0)).toBe(true);
   });
 
-  it('loss: columns check off progressively and the average appears at the end', () => {
-    expect(computeOverviewSchedule(0.6, 'loss', 4, 5).lossRevealed).toBeLessThan(4);
+  it('loss: columns check off progressively, focus stays in range, average appears at end', () => {
+    // 4 input tokens → 3 loss columns (the last position has no next-token truth).
+    expect(computeOverviewSchedule(0.6, 'loss', 4, 5).lossRevealed).toBeLessThan(3);
     const end = computeOverviewSchedule(1, 'loss', 4, 5);
-    expect(end.lossRevealed).toBe(4);
+    expect(end.lossRevealed).toBe(3);
+    // Focus must never index past the columns (was an off-by-one vs tokenCount).
+    expect(end.lossFocusCol).toBeGreaterThanOrEqual(0);
+    expect(end.lossFocusCol).toBeLessThan(3);
     expect(end.showAverage).toBeCloseTo(1, 6);
     expect(computeOverviewSchedule(0.6, 'loss', 4, 5).showAverage).toBe(0);
   });

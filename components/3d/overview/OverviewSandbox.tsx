@@ -69,7 +69,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const [playing, setPlaying] = useState(true);
   const tRef = useRef(0);
   const scheme = useResolvedScheme();
-  const palette = getSandboxPalette('overview', scheme) as PaletteLike;
+  const palette: PaletteLike = getSandboxPalette('overview', scheme);
 
   useEffect(() => { loadWeights().then(setWeights).catch(() => setWeights(null)); }, []);
 
