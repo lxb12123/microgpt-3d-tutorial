@@ -100,7 +100,7 @@ export function buildProbBars(
 ): ProbBar[] {
   const ranked = probs
     .map((prob, index) => ({ index, prob }))
-    .sort((a, b) => b.prob - a.prob || b.index - a.index);
+    .sort((a, b) => b.prob - a.prob);
   const top = ranked.slice(0, topK);
   const rest = ranked.slice(topK);
 

@@ -110,7 +110,7 @@ describe('buildProbBars', () => {
 
   it('omits the "other" bar when topK already covers the vocab', () => {
     const bars = buildProbBars([0.5, 0.5], ['.', 'a'], 0, 5);
-    expect(bars.map((b) => b.char)).toEqual(['a', 'BOS']);
+    expect(bars.map((b) => b.char)).toEqual(['BOS', 'a']);
     expect(bars.some((b) => b.isOther)).toBe(false);
   });
 
