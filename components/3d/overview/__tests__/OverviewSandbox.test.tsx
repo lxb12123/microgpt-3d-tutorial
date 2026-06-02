@@ -45,9 +45,10 @@ describe('OverviewSandbox', () => {
   it('renders mode toggle and three presets', async () => {
     render(<OverviewSandbox defaultText="anna" />);
     await waitFor(() => expect(screen.getByDisplayValue('anna')).toBeInTheDocument());
-    expect(screen.getByText(/forward/i)).toBeInTheDocument();
-    expect(screen.getByText(/loss/i)).toBeInTheDocument();
-    expect(screen.getByText(/sample/i)).toBeInTheDocument();
+    // Assert the mode radio buttons are present as clickable controls (stronger than text check).
+    expect(screen.getByRole('radio', { name: /forward/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /loss/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /sample/i })).toBeInTheDocument();
     expect(screen.getByText('emma')).toBeInTheDocument();
     expect(screen.getByText('jacob')).toBeInTheDocument();
   });
