@@ -3,18 +3,15 @@
 import { TokenCube } from '@/components/3d/primitives/TokenCube';
 import { SceneText } from './SceneText';
 import { tokenX } from './Pipeline';
-import type { PaletteLike } from './Pipeline';
+import type { PaletteLike, Ink } from './Pipeline';
 import type { LossColumn } from '../modes';
 
 const TRUTH_Y = -1.6;
 const MARK_Y = -0.85;
-const GREEN = '#34d399';
-const RED = '#f87171';
 
 /** A ✓ or ✗ drawn from thin boxes — the bundled mono font has no check/cross
- *  glyphs, so we render them as geometry (always crisp, theme-independent). */
-function Mark({ correct }: { correct: boolean }) {
-  const color = correct ? GREEN : RED;
+ *  glyphs, so we render them as geometry (always crisp). */
+function Mark({ color, correct }: { color: string; correct: boolean }) {
   if (correct) {
     return (
       <group>
@@ -51,7 +48,7 @@ function Mark({ correct }: { correct: boolean }) {
  * ✗ mark, not the input character.
  */
 export function LossView({
-  inputChars, columns, tokenActivation, lossRevealed, lossFocusCol, showAverage, averageLoss, palette,
+  inputChars, columns, tokenActivation, lossRevealed, lossFocusCol, showAverage, averageLoss, palette, ink,
 }: {
   inputChars: string[];
   columns: LossColumn[];
@@ -61,14 +58,15 @@ export function LossView({
   showAverage: number;
   averageLoss: number;
   palette: PaletteLike;
+  ink: Ink;
 }) {
   const focusCol = lossFocusCol >= 0 && lossFocusCol < columns.length ? columns[lossFocusCol] : null;
   return (
     <>
-      <SceneText position={[tokenX(0) - 0.5, 0, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, 0, 0]} fontSize={0.18} anchorX="right" color={ink.faint} halo={ink.halo}>
         Input
       </SceneText>
-      <SceneText position={[tokenX(0) - 0.5, TRUTH_Y, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, TRUTH_Y, 0]} fontSize={0.18} anchorX="right" color={ink.faint} halo={ink.halo}>
         Truth
       </SceneText>
 
@@ -100,7 +98,7 @@ export function LossView({
 
       {inputChars.length > columns.length && (
         <SceneText position={[tokenX(columns.length), MARK_Y, 0]} fontSize={0.14}
-          color="#64748b" anchorX="center" maxWidth={1.4} textAlign="center" lineHeight={1.2}>
+          color={ink.faint} halo={ink.halo} anchorX="center" maxWidth={1.4} textAlign="center" lineHeight={1.2}>
           no observed next char
         </SceneText>
       )}
@@ -108,15 +106,16 @@ export function LossView({
       {columns.map((col, i) => {
         const revealed = i < lossRevealed;
         const x = tokenX(i);
+        const markColor = col.correct ? ink.green : ink.red;
         return (
           <group key={`col-${i}`}>
-            <SceneText position={[x, TRUTH_Y, 0]} fontSize={0.3}
-              color={revealed ? (col.correct ? GREEN : RED) : '#475569'}>
+            <SceneText position={[x, TRUTH_Y, 0]} fontSize={0.3} halo={ink.halo}
+              color={revealed ? markColor : ink.faint}>
               {col.truthChar}
             </SceneText>
             {revealed && (
               <group position={[x, MARK_Y, 0]}>
-                <Mark correct={col.correct} />
+                <Mark color={markColor} correct={col.correct} />
               </group>
             )}
           </group>
@@ -126,7 +125,7 @@ export function LossView({
       {/* Focused-column callout, placed in the empty space to the right —
           three short lines so it stays readable in a 480px GIF. */}
       {focusCol && (
-        <SceneText position={[1.3, -0.1, 0]} fontSize={0.24} anchorX="left" color="#e2e8f0"
+        <SceneText position={[1.3, -0.1, 0]} fontSize={0.24} anchorX="left" color={ink.strong} halo={ink.halo}
           maxWidth={6} textAlign="left" lineHeight={1.5}>
           {`truth = "${focusCol.truthChar}"\np(truth) = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
         </SceneText>
@@ -134,7 +133,7 @@ export function LossView({
 
       {showAverage > 0.01 && (
         <group position={[0, TRUTH_Y - 0.95, 0]}>
-          <SceneText fontSize={0.24} color="#facc15"
+          <SceneText fontSize={0.24} color={ink.amber} halo={ink.halo}
             fillOpacity={showAverage} outlineOpacity={showAverage}>
             {`Average loss = mean(-log p(true next char)) = ${averageLoss.toFixed(2)}`}
           </SceneText>

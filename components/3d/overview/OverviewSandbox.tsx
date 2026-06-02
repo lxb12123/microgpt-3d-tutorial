@@ -14,7 +14,7 @@ import {
 } from './modes';
 import { SceneText } from './scene/SceneText';
 import {
-  InputRow, ModelBox, FlowArrow, ProbBars, tokenRightEdge, barX, type PaletteLike,
+  InputRow, ModelBox, FlowArrow, ProbBars, tokenRightEdge, barX, getInk, type PaletteLike,
 } from './scene/Pipeline';
 import { LossView } from './scene/LossView';
 import { SampleOverlay } from './scene/SampleOverlay';
@@ -70,6 +70,9 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const tRef = useRef(0);
   const scheme = useResolvedScheme();
   const palette: PaletteLike = getSandboxPalette('overview', scheme);
+  // Theme-aware text colours — the dark-theme greys/whites are illegible on the
+  // light theme's cream background, which is what made the GIF text look fuzzy.
+  const ink = getInk(scheme);
 
   useEffect(() => { loadWeights().then(setWeights).catch(() => setWeights(null)); }, []);
 
@@ -156,6 +159,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   );
 
   const theme = MODE_THEME[mode];
+  const titleTint = mode === 'forward' ? ink.green : mode === 'loss' ? ink.red : ink.orange;
   const inRightEdge = tokenRightEdge(tokenCount);
   const lastBarX = barX(bars.length - 1);
 
@@ -172,10 +176,10 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
 
       {ok && (
         <group scale={0.58} position={[-0.35, 0.15, 0]}>
-          <SceneText position={[0, 2.5, 0]} fontSize={0.42} color={theme.tint} letterSpacing={0.08}>
+          <SceneText position={[0, 2.5, 0]} fontSize={0.42} color={titleTint} halo={ink.halo} letterSpacing={0.08}>
             {theme.title}
           </SceneText>
-          <SceneText position={[0, 2.0, 0]} fontSize={0.21} color="#cbd5e1" maxWidth={9}>
+          <SceneText position={[0, 2.0, 0]} fontSize={0.21} color={ink.muted} halo={ink.halo} maxWidth={9}>
             {theme.subtitle}
           </SceneText>
 
@@ -185,8 +189,8 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
               <FlowArrow x0={inRightEdge + 0.45} x1={0.0} flow={schedule.flowIn} />
               <ModelBox activation={schedule.modelActivation} palette={palette} />
               <FlowArrow x0={1.2} x1={barX(0) - 0.4} flow={schedule.flowOut} />
-              <ProbBars bars={bars} activation={schedule.barActivation} palette={palette} />
-              <SceneText position={[(barX(0) + lastBarX) / 2, -1.4, 0]} fontSize={0.18} color="#94a3b8">
+              <ProbBars bars={bars} activation={schedule.barActivation} palette={palette} ink={ink} />
+              <SceneText position={[(barX(0) + lastBarX) / 2, -1.4, 0]} fontSize={0.18} color={ink.faint} halo={ink.halo}>
                 next-character probabilities
               </SceneText>
             </>
@@ -196,11 +200,11 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
             <SampleOverlay bars={bars} chosenBarIndex={chosenBarIndex} chosenChar={chosenChar}
               isStop={isStop} fromOther={fromOther}
               drawProgress={schedule.drawProgress} flyProgress={schedule.flyProgress}
-              tokenCount={tokenCount} palette={palette} />
+              tokenCount={tokenCount} palette={palette} ink={ink} />
           )}
 
           {mode === 'loss' && ok && (
-            <LossView inputChars={inputChars} columns={ok.lossCols}
+            <LossView inputChars={inputChars} columns={ok.lossCols} ink={ink}
               tokenActivation={schedule.tokenActivation}
               lossRevealed={schedule.lossRevealed} lossFocusCol={schedule.lossFocusCol}
               showAverage={schedule.showAverage} averageLoss={ok.avg} palette={palette} />
