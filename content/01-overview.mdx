@@ -8,22 +8,22 @@ This whole lesson fits in one sentence:
 
 > The model reads a few characters, predicts a distribution over what should come next, and learns by comparing its prediction to the truth.
 
-Three views of that loop — each is a mode you can drive in the sandbox below. The clips show the live scene orbiting:
+Three views of that loop — each is a mode you can drive in the sandbox below. Every clip shows the same pipeline: **input characters → the MODEL → a probability for each possible next character.**
 
-**Forward** — tokens flow left to right through one transformer block. Attention scores connect tokens to each other. The MLP block pulses on each position. The right end is a probability bar over the full vocabulary.
+**Forward** — the model reads the characters and predicts a probability for *every* possible next character. The bars on the right are that distribution (the most likely few, plus an `other` bar for the rest). The point: the model outputs a distribution, not a single answer.
 
-<img src="/microgpt-3d-tutorial/diagrams/overview-forward-light.gif" alt="Forward pass: token cubes feeding a transformer block into a probability bar, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
-<img src="/microgpt-3d-tutorial/diagrams/overview-forward-dark.gif" alt="Forward pass: token cubes feeding a transformer block into a probability bar, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-forward-light.gif" alt="Forward: input characters feed a MODEL box; on the right, labeled bars show the probability of each next character, tallest highlighted" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-forward-dark.gif" alt="Forward: input characters feed a MODEL box; on the right, labeled bars show the probability of each next character, tallest highlighted" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
-**Loss** — the model is asked to predict each next character. Where it's wrong, the corresponding input token turns red. Loss is just the negative log probability of the truth, averaged.
+**Loss** — for each position the model predicts the next character, and we compare that to the *true* next character. A green check means its top guess was right, a red cross means it was wrong — but the loss itself is the negative log of the probability the model gave to the truth, `-log p(true)`, averaged over positions. So loss depends on the probability of the truth, not just whether the top guess matched.
 
-<img src="/microgpt-3d-tutorial/diagrams/overview-loss-light.gif" alt="Loss view: mis-predicted input tokens highlighted, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
-<img src="/microgpt-3d-tutorial/diagrams/overview-loss-dark.gif" alt="Loss view: mis-predicted input tokens highlighted, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-loss-light.gif" alt="Loss: input characters aligned to their true next characters, each column marked with a green check or red cross, ending in the average loss" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-loss-dark.gif" alt="Loss: input characters aligned to their true next characters, each column marked with a green check or red cross, ending in the average loss" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
-**Sample** — at the last position, draw one character from the model's distribution and append it to the input. Repeat to generate text.
+**Sample** — at the last position, draw one character *at random according to the probabilities* (not always the most likely one), append it to the input, and repeat to generate text.
 
-<img src="/microgpt-3d-tutorial/diagrams/overview-sample-light.gif" alt="Sample view: a character drawn from the last-position distribution flies back to the input row, scene orbiting" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
-<img src="/microgpt-3d-tutorial/diagrams/overview-sample-dark.gif" alt="Sample view: a character drawn from the last-position distribution flies back to the input row, scene orbiting" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-light.gif" alt="Sample: an orange marker draws one character from the probability bars; the chosen character flies to the end of the input row" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-dark.gif" alt="Sample: an orange marker draws one character from the probability bars; the chosen character flies to the end of the input row" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
 The 02 lesson zooms into the autograd that makes "learn from loss" possible. The 03 lesson zooms into the self-attention block. This one keeps the bird's-eye view.
 
@@ -51,6 +51,6 @@ The training step (subsection `overview-training-step`) is just: forward → com
 
 ## Sandbox
 
-Type up to 10 characters (or pick a preset). Switch modes: **Forward** shows the live distribution over the vocabulary for the last position; **Loss** highlights mis-predicted input characters in red; **Sample** draws one character from the last-position distribution and appends it.
+Type up to 10 characters (or pick a preset). Switch modes: **Forward** shows the predicted probability for the next character; **Loss** compares each prediction to the true next character; **Sample** draws one character from the last-position distribution and appends it.
 
 <OverviewSandbox defaultText="anna" />
