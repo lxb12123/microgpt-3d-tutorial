@@ -109,3 +109,31 @@ describe('buildProbBars', () => {
     expect(bars[0].char).toBe('BOS');
   });
 });
+
+describe('buildLossColumns', () => {
+  const vocab = ['.', 'a', 'n']; // 0 = BOS
+  const ids = [0, 1, 2];
+  const logits = [
+    [0, 3, 0], // pos 0: argmax 'a'(1), truth 'a' → correct
+    [0, 0, 0], // pos 1: uniform; argmax 'BOS'(0), truth 'n' → wrong
+  ];
+
+  it('aligns input char to the true next char and flags correctness', () => {
+    const cols = buildLossColumns(logits, ids, vocab, 0);
+    expect(cols).toHaveLength(2);
+    expect(cols[0]).toMatchObject({ inputChar: 'BOS', truthChar: 'a', correct: true });
+    expect(cols[1]).toMatchObject({ inputChar: 'a', truthChar: 'n', correct: false });
+  });
+
+  it('reports p(truth) and loss = -log p(truth)', () => {
+    const cols = buildLossColumns(logits, ids, vocab, 0);
+    expect(cols[1].pTruth).toBeCloseTo(1 / 3, 6);
+    expect(cols[1].loss).toBeCloseTo(Math.log(3), 6);
+  });
+
+  it('averageLoss is the mean of per-column losses', () => {
+    const cols = buildLossColumns(logits, ids, vocab, 0);
+    const mean = cols.reduce((a, c) => a + c.loss, 0) / cols.length;
+    expect(averageLoss(cols)).toBeCloseTo(mean, 9);
+  });
+});

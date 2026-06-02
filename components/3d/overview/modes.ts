@@ -104,6 +104,53 @@ export function buildProbBars(
   return bars;
 }
 
+export interface LossColumn {
+  /** The input character at this position (BOS rendered literally). */
+  inputChar: string;
+  /** The true next character the model should have predicted. */
+  truthChar: string;
+  /** Probability the model assigned to the truth. */
+  pTruth: number;
+  /** -log p(truth). */
+  loss: number;
+  /** Did the model's top-1 prediction equal the truth? */
+  correct: boolean;
+}
+
+/**
+ * Build per-position columns comparing the model's prediction to the true next
+ * character. `logits` covers positions 0..n-2 (the last position has no next
+ * token). Truth at position t is ids[t+1].
+ */
+export function buildLossColumns(
+  logits: number[][],
+  ids: number[],
+  vocab: string[],
+  bosId: number,
+): LossColumn[] {
+  const label = (id: number) => (id === bosId ? 'BOS' : vocab[id] ?? '?');
+  return logits.map((row, t) => {
+    const probs = softmaxRow(row);
+    const truthId = ids[t + 1];
+    let arg = 0;
+    for (let i = 1; i < row.length; i++) if (row[i] > row[arg]) arg = i;
+    const pTruth = probs[truthId] ?? 0;
+    return {
+      inputChar: label(ids[t]),
+      truthChar: label(truthId),
+      pTruth,
+      loss: -Math.log(Math.max(pTruth, 1e-12)),
+      correct: arg === truthId,
+    };
+  });
+}
+
+/** Mean of per-column losses — the scalar shown at the end of the loss clip. */
+export function averageLoss(cols: LossColumn[]): number {
+  if (cols.length === 0) return 0;
+  return cols.reduce((a, c) => a + c.loss, 0) / cols.length;
+}
+
 export const RAMP = 0.18;
 
 /** Smoothstep ramp: 0 below `start`, 1 above `start+RAMP`, eased in between. */
