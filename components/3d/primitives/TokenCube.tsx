@@ -1,34 +1,23 @@
 'use client';
 
-import { useGLTF, Html } from '@react-three/drei';
-import { useMemo, type CSSProperties } from 'react';
+import { useGLTF } from '@react-three/drei';
+import { useLayoutEffect, useMemo } from 'react';
 import type { Object3D } from 'three';
+import { SceneText } from '@/components/3d/overview/scene/SceneText';
 
 const URL = '/microgpt-3d-tutorial/models/primitives/token.glb';
-
-// White text + black halo + translucent pill — readable on any cube color
-// and on both Nextra themes without per-theme detection.
-const labelStyle: CSSProperties = {
-  pointerEvents: 'none',
-  color: '#fff',
-  fontSize: 22,
-  fontWeight: 700,
-  textShadow: '0 0 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.6)',
-  padding: '2px 6px',
-  borderRadius: 4,
-  background: 'rgba(0,0,0,0.35)',
-  userSelect: 'none',
-};
 
 export interface TokenCubeProps {
   position: [number, number, number];
   char: string;
   color?: string;
-  /** Override the emissive accent color (the cyan underglow bar).
-   *  When omitted, the .glb's baked color is preserved. */
   accentColor?: string;
-  /** Override emissive intensity (0 = matte, higher = brighter glow). */
   accentStrength?: number;
+  /** Render the char as in-scene SDF text on the cube. Defaults to true.
+   *  (Set false when a parent draws its own label.) */
+  showLabel?: boolean;
+  /** Label font size in world units. */
+  labelSize?: number;
 }
 
 interface MaterialLike {
@@ -38,22 +27,12 @@ interface MaterialLike {
   emissiveIntensity?: number;
   clone?: () => MaterialLike;
 }
+interface MeshLike { isMesh?: boolean; material?: MaterialLike; }
 
-interface MeshLike {
-  isMesh?: boolean;
-  material?: MaterialLike;
-}
-
-// Skip the cyan emissive underglow bar (TokenCubeGlowMat) so the cyberpunk
-// accent isn't washed out by the runtime body color override. Detect via the
-// emissive color sum or the material name — NOT via emissiveIntensity, which
-// three.js MeshStandardMaterial defaults to 1.0 even on materials with zero
-// emissive color (would false-positive every material in the .glb and paint
-// the body cyan, which is exactly the bug we hit).
+// Skip the cyan emissive accent bar via emissive-color sum or the material name
+// — NOT emissiveIntensity, which defaults to 1.0 even on non-emissive materials.
 function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
-  const r = mat.emissive?.r ?? 0;
-  const g = mat.emissive?.g ?? 0;
-  const b = mat.emissive?.b ?? 0;
+  const r = mat.emissive?.r ?? 0, g = mat.emissive?.g ?? 0, b = mat.emissive?.b ?? 0;
   if (r + g + b > 0) return true;
   return mat.name === 'TokenCubeGlowMat';
 }
@@ -64,20 +43,33 @@ export function TokenCube({
   color = '#d8e8ff',
   accentColor,
   accentStrength,
+  showLabel = true,
+  labelSize = 0.3,
 }: TokenCubeProps) {
   const gltf = useGLTF(URL);
+
+  // Clone ONCE per mounted cube, keyed on geometry only. clone(true) shares
+  // material refs across clones, so also clone each material here so per-cube
+  // color overrides don't bleed across the row. This never rebuilds on a color
+  // change — that was the per-frame flicker.
   const scene = useMemo(() => {
     const cloned = gltf.scene.clone(true);
     cloned.traverse((obj: Object3D) => {
       const mesh = obj as unknown as MeshLike;
       if (!mesh.isMesh || !mesh.material) return;
-      // Object3D.clone(true) deep-copies the node hierarchy but SHARES the
-      // materials by reference. Multiple TokenCube instances mounted from the
-      // same glb would then all mutate one shared material — the last cube
-      // rendered wins, so every cube ends up the same color (e.g. a whole token
-      // row turning gold/red at once). Clone the material per cube first.
-      const mat = mesh.material.clone ? mesh.material.clone() : mesh.material;
-      mesh.material = mat;
+      mesh.material = mesh.material.clone ? mesh.material.clone() : mesh.material;
+    });
+    return cloned;
+  }, [gltf.scene]);
+
+  // Apply appearance imperatively whenever the (cheap) color props change. No
+  // geometry/material reconstruction, so no flicker even if the parent
+  // re-renders every frame.
+  useLayoutEffect(() => {
+    scene.traverse((obj: Object3D) => {
+      const mesh = obj as unknown as MeshLike;
+      if (!mesh.isMesh || !mesh.material) return;
+      const mat = mesh.material;
       if (isEmissiveAccent(mat)) {
         if (accentColor && mat.emissive?.set) mat.emissive.set(accentColor);
         if (accentStrength !== undefined && mat.emissiveIntensity !== undefined) {
@@ -87,15 +79,22 @@ export function TokenCube({
       }
       mat.color?.set(color);
     });
-    return cloned;
-  }, [gltf.scene, color, accentColor, accentStrength]);
+  }, [scene, color, accentColor, accentStrength]);
 
   return (
     <group position={position}>
       <primitive object={scene} />
-      <Html center distanceFactor={6} style={labelStyle}>
-        {char}
-      </Html>
+      {showLabel && (
+        <SceneText
+          position={[0, 0, 0.5]}
+          fontSize={labelSize}
+          color="#ffffff"
+          outlineWidth={0.018}
+          outlineColor="#000000"
+        >
+          {char}
+        </SceneText>
+      )}
     </group>
   );
 }
