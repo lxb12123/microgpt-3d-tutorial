@@ -2,7 +2,7 @@
 
 import { TokenCube } from '@/components/3d/primitives/TokenCube';
 import { SceneText } from './SceneText';
-import { barX, tokenX, BAR_BASE_Y, BAR_MAX_H, type PaletteLike } from './Pipeline';
+import { barX, tokenX, BAR_BASE_Y, BAR_MAX_H, type PaletteLike, type Ink } from './Pipeline';
 import type { ProbBar } from '../modes';
 
 /**
@@ -15,7 +15,7 @@ import type { ProbBar } from '../modes';
  *    because predicting the sentinel as the next token ends the sequence.
  */
 export function SampleOverlay({
-  bars, chosenBarIndex, chosenChar, isStop, fromOther, drawProgress, flyProgress, tokenCount, palette,
+  bars, chosenBarIndex, chosenChar, isStop, fromOther, drawProgress, flyProgress, tokenCount, palette, ink,
 }: {
   bars: ProbBar[];
   chosenBarIndex: number;
@@ -26,6 +26,7 @@ export function SampleOverlay({
   flyProgress: number;
   tokenCount: number;
   palette: PaletteLike;
+  ink: Ink;
 }) {
   const peak = Math.max(...bars.map((b) => b.prob), 1e-6);
   const scanIdx = drawProgress < 1 ? drawProgress * (bars.length - 1) : chosenBarIndex;
@@ -45,10 +46,10 @@ export function SampleOverlay({
         <group position={[markerX, BAR_BASE_Y + BAR_MAX_H + 0.7, 0]}>
           <mesh rotation={[0, 0, Math.PI]}>
             <coneGeometry args={[0.16, 0.34, 12]} />
-            <meshBasicMaterial color="#f59e0b" />
+            <meshBasicMaterial color={ink.orange} />
           </mesh>
           {markerSettled && (
-            <SceneText position={[0, 0.4, 0]} fontSize={0.2} color="#f59e0b">draw</SceneText>
+            <SceneText position={[0, 0.4, 0]} fontSize={0.2} color={ink.orange} halo={ink.halo}>draw</SceneText>
           )}
         </group>
       )}
@@ -57,7 +58,7 @@ export function SampleOverlay({
           Placed in the clear area above MODEL (where the repeat hint would go). */}
       {isStop && markerSettled && (
         <SceneText position={[0.6, 1.5, 0]} fontSize={0.24}
-          color="#f87171" anchorX="center" maxWidth={6} textAlign="center">
+          color={ink.red} anchorX="center" maxWidth={6} halo={ink.halo} textAlign="center">
           STOP → generation ends
         </SceneText>
       )}
@@ -66,7 +67,7 @@ export function SampleOverlay({
       {!isStop && flyProgress > 0 && (
         <group position={[fx, fy, 0.1]} scale={0.7}>
           <TokenCube position={[0, 0, 0]} char={chosenChar}
-            color={palette.highlight} accentColor="#f59e0b" accentStrength={1.2}
+            color={palette.highlight} accentColor={ink.orange} accentStrength={1.2}
             labelSize={chosenChar.length > 1 ? 0.2 : 0.34} />
         </group>
       )}
@@ -74,7 +75,7 @@ export function SampleOverlay({
       {/* If the drawn char was hidden inside the aggregated "other" bar, name it. */}
       {!isStop && fromOther && drawProgress > 0.4 && (
         <SceneText position={[barX(chosenBarIndex), BAR_BASE_Y + BAR_MAX_H + 1.15, 0]} fontSize={0.18}
-          color="#f59e0b" anchorX="center">
+          color={ink.orange} anchorX="center" halo={ink.halo}>
           {`drawn from other: ${chosenChar}`}
         </SceneText>
       )}
@@ -85,13 +86,13 @@ export function SampleOverlay({
         <group position={[0.55, 1.55, 0]}>
           <mesh rotation={[0, 0, Math.PI * 0.2]}>
             <torusGeometry args={[0.18, 0.032, 8, 24, Math.PI * 1.5]} />
-            <meshBasicMaterial color="#f59e0b" />
+            <meshBasicMaterial color={ink.orange} />
           </mesh>
           <mesh position={[0.2, 0.15, 0]} rotation={[0, 0, -Math.PI * 0.1]}>
             <coneGeometry args={[0.08, 0.16, 10]} />
-            <meshBasicMaterial color="#f59e0b" />
+            <meshBasicMaterial color={ink.orange} />
           </mesh>
-          <SceneText position={[0.48, 0, 0]} fontSize={0.2} color="#f59e0b" anchorX="left">
+          <SceneText position={[0.48, 0, 0]} fontSize={0.2} color={ink.orange} anchorX="left" halo={ink.halo}>
             repeat
           </SceneText>
         </group>

@@ -8,6 +8,19 @@ export interface PaletteLike {
   body: string; accent: string; highlight: string; edge: string; bg: string;
 }
 
+/** Theme-aware *text* colours. The dark-theme greys/whites are illegible on the
+ *  light theme's cream background, so scene text picks colours from here. */
+export interface Ink {
+  strong: string; muted: string; faint: string;
+  green: string; red: string; amber: string; orange: string; halo: string;
+}
+
+export function getInk(scheme: 'light' | 'dark'): Ink {
+  return scheme === 'light'
+    ? { strong: '#1e293b', muted: '#475569', faint: '#64748b', green: '#047857', red: '#dc2626', amber: '#b45309', orange: '#c2660c', halo: '#fff7ed' }
+    : { strong: '#e5edff', muted: '#cbd5e1', faint: '#94a3b8', green: '#34d399', red: '#f87171', amber: '#facc15', orange: '#f59e0b', halo: '#000000' };
+}
+
 const TOKEN_START_X = -4.0;
 const TOKEN_STEP = 0.7;
 const BAR_START_X = 2.7;
@@ -107,8 +120,8 @@ const OTHER_COLOR = '#5b6679';
  *  token* is highlighted (the "other" aggregate is excluded — it isn't one
  *  character you could draw, so it must not read as the model's top answer). */
 export function ProbBars({
-  bars, activation, palette,
-}: { bars: ProbBar[]; activation: number[]; palette: PaletteLike }) {
+  bars, activation, palette, ink,
+}: { bars: ProbBar[]; activation: number[]; palette: PaletteLike; ink: Ink }) {
   const peak = Math.max(...bars.map((b) => b.prob), 1e-6);
   let topIdx = -1;
   let topProb = -Infinity;
@@ -133,14 +146,15 @@ export function ProbBars({
               />
             </mesh>
             <SceneText position={[0, BAR_BASE_Y - 0.3, 0]} fontSize={b.isOther ? 0.2 : 0.28}
-              color={b.isOther ? '#94a3b8' : '#e5edff'}>
+              halo={ink.halo} color={b.isOther ? ink.faint : ink.strong}>
               {b.char}
             </SceneText>
             {act > 0.15 && (
               <SceneText
                 position={[0, BAR_BASE_Y + fullH + 0.28, 0]}
                 fontSize={0.22}
-                color={isTop ? palette.highlight : b.isOther ? '#94a3b8' : '#cbd5e1'}
+                halo={ink.halo}
+                color={isTop ? ink.amber : b.isOther ? ink.faint : ink.muted}
               >
                 {`${Math.round(b.prob * 100)}%`}
               </SceneText>
