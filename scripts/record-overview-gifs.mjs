@@ -37,12 +37,21 @@ function run(cmd, args) {
   });
 }
 
+// Crop the canvas to the content band (the scene leaves large empty margins top
+// and bottom) and encode at a generous 760px wide with a full 256-colour palette
+// and NO dithering — flat SDF text and bars stay crisp instead of being softened
+// by a downscale-to-480 + dithered palette. The 760px GIF is downsampled by the
+// browser at the page's display width, which looks sharper than a native-480 GIF
+// (and shows more detail on retina). `crop=in_w` keeps full width (no horizontal
+// clipping); the 640px-tall band at y=180 is fixed by the 560px scene height.
+const VF = 'crop=in_w:640:0:180,scale=760:-1:flags=lanczos';
+
 async function ffmpegGif(framePattern, outPath) {
   const palette = `${outPath}.png`;
   await run('ffmpeg', ['-y', '-framerate', String(FPS), '-i', framePattern,
-    '-vf', 'scale=480:-1:flags=lanczos,palettegen=max_colors=128', palette]);
+    '-vf', `${VF},palettegen=max_colors=256`, palette]);
   await run('ffmpeg', ['-y', '-framerate', String(FPS), '-i', framePattern, '-i', palette,
-    '-lavfi', 'scale=480:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer',
+    '-lavfi', `${VF}[x];[x][1:v]paletteuse=dither=none`,
     '-loop', '0', outPath]);
   await rm(palette, { force: true });
 }
