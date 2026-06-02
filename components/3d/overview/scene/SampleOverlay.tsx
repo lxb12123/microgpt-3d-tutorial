@@ -56,10 +56,22 @@ export function SampleOverlay({
         </group>
       )}
 
-      {flyProgress > 0.9 && (
-        <SceneText position={[0.6, 1.7, 0]} fontSize={0.15} color="#f59e0b">
-          ↻ repeat
-        </SceneText>
+      {/* Loop-back "repeat" hint — drawn as a curved arrow (the bundled mono
+          font has no ↻ glyph) plus a label, to show generation is iterative. */}
+      {flyProgress > 0.85 && (
+        <group position={[0.55, 1.55, 0]}>
+          <mesh rotation={[0, 0, Math.PI * 0.2]}>
+            <torusGeometry args={[0.16, 0.028, 8, 24, Math.PI * 1.5]} />
+            <meshBasicMaterial color="#f59e0b" />
+          </mesh>
+          <mesh position={[0.18, 0.13, 0]} rotation={[0, 0, -Math.PI * 0.1]}>
+            <coneGeometry args={[0.07, 0.14, 10]} />
+            <meshBasicMaterial color="#f59e0b" />
+          </mesh>
+          <SceneText position={[0.42, 0, 0]} fontSize={0.16} color="#f59e0b" anchorX="left">
+            repeat
+          </SceneText>
+        </group>
       )}
     </>
   );

@@ -7,13 +7,48 @@ import type { PaletteLike } from './Pipeline';
 import type { LossColumn } from '../modes';
 
 const TRUTH_Y = -1.6;
-const MARK_Y = -0.9;
+const MARK_Y = -0.85;
+const GREEN = '#34d399';
+const RED = '#f87171';
+
+/** A ✓ or ✗ drawn from thin boxes — the bundled mono font has no check/cross
+ *  glyphs, so we render them as geometry (always crisp, theme-independent). */
+function Mark({ correct }: { correct: boolean }) {
+  const color = correct ? GREEN : RED;
+  if (correct) {
+    return (
+      <group>
+        <mesh position={[-0.07, -0.03, 0]} rotation={[0, 0, Math.PI / 4]}>
+          <boxGeometry args={[0.17, 0.06, 0.06]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+        <mesh position={[0.07, 0.06, 0]} rotation={[0, 0, -Math.PI / 3.2]}>
+          <boxGeometry args={[0.34, 0.06, 0.06]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+      </group>
+    );
+  }
+  return (
+    <group>
+      <mesh rotation={[0, 0, Math.PI / 4]}>
+        <boxGeometry args={[0.3, 0.06, 0.06]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh rotation={[0, 0, -Math.PI / 4]}>
+        <boxGeometry args={[0.3, 0.06, 0.06]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+    </group>
+  );
+}
 
 /**
  * Loss view: input cubes on top, the true next-character below each, a green ✓
- * or red ✗ once a column is "checked", a single callout on the focused column,
- * and the average-loss line at the end. Input cubes are NEVER recolored red —
- * the red lives on the ✗ mark, not the input character.
+ * or red ✗ (drawn as geometry) once a column is "checked", a callout in the
+ * empty space to the right detailing the focused column, and the average-loss
+ * line at the end. Input cubes are NEVER recolored red — the red lives on the
+ * ✗ mark, not the input character.
  */
 export function LossView({
   inputChars, columns, tokenActivation, lossRevealed, lossFocusCol, showAverage, averageLoss, palette,
@@ -27,14 +62,23 @@ export function LossView({
   averageLoss: number;
   palette: PaletteLike;
 }) {
+  const focusCol = lossFocusCol >= 0 && lossFocusCol < columns.length ? columns[lossFocusCol] : null;
   return (
     <>
-      <SceneText position={[tokenX(0) - 1.0, 0, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, 0, 0]} fontSize={0.15} anchorX="right" color="#94a3b8">
         Input
       </SceneText>
-      <SceneText position={[tokenX(0) - 1.0, TRUTH_Y, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, TRUTH_Y, 0]} fontSize={0.15} anchorX="right" color="#94a3b8">
         Truth
       </SceneText>
+
+      {/* Faint highlight tying the focused column to the right-side callout. */}
+      {focusCol && (
+        <mesh position={[tokenX(lossFocusCol), (TRUTH_Y + 0.4) / 2, -0.25]}>
+          <boxGeometry args={[0.66, 2.4, 0.02]} />
+          <meshBasicMaterial color="#334155" transparent opacity={0.55} />
+        </mesh>
+      )}
 
       {inputChars.map((ch, i) => {
         const act = tokenActivation[i] ?? 0;
@@ -50,29 +94,29 @@ export function LossView({
 
       {columns.map((col, i) => {
         const revealed = i < lossRevealed;
-        const focused = i === lossFocusCol;
         const x = tokenX(i);
         return (
           <group key={`col-${i}`}>
             <SceneText position={[x, TRUTH_Y, 0]} fontSize={0.26}
-              color={revealed ? (col.correct ? '#34d399' : '#f87171') : '#475569'}>
+              color={revealed ? (col.correct ? GREEN : RED) : '#475569'}>
               {col.truthChar}
             </SceneText>
             {revealed && (
-              <SceneText position={[x, MARK_Y, 0]} fontSize={0.28}
-                color={col.correct ? '#34d399' : '#f87171'}>
-                {col.correct ? '✓' : '✗'}
-              </SceneText>
-            )}
-            {focused && (
-              <SceneText position={[x, MARK_Y + 0.55, 0]} fontSize={0.15} color="#e2e8f0"
-                maxWidth={3} textAlign="center">
-                {`truth: ${col.truthChar} · p=${Math.round(col.pTruth * 100)}% · loss=-log(${col.pTruth.toFixed(2)})`}
-              </SceneText>
+              <group position={[x, MARK_Y, 0]}>
+                <Mark correct={col.correct} />
+              </group>
             )}
           </group>
         );
       })}
+
+      {/* Focused-column callout, placed in the empty space to the right. */}
+      {focusCol && (
+        <SceneText position={[1.2, -0.2, 0]} fontSize={0.2} anchorX="left" color="#e2e8f0"
+          maxWidth={6} textAlign="left" lineHeight={1.45}>
+          {`true next char: "${focusCol.truthChar}"\nmodel gave it p = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
+        </SceneText>
+      )}
 
       {showAverage > 0.01 && (
         <group position={[0, TRUTH_Y - 0.9, 0]}>

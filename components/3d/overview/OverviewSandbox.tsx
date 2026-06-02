@@ -166,7 +166,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
       <TimelineClock playing={playing} tRef={tRef} onTick={setT} />
 
       {ok && (
-        <group scale={0.72} position={[-0.3, 0.2, 0]}>
+        <group scale={0.58} position={[-0.35, 0.15, 0]}>
           <SceneText position={[0, 2.5, 0]} fontSize={0.34} color={theme.tint} letterSpacing={0.08}>
             {theme.title}
           </SceneText>

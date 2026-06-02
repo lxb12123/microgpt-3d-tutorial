@@ -90,7 +90,7 @@ export function SceneViewer({
 
   return (
     <div style={{ width: '100%', height, position: 'relative' }}>
-      {hud ? <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
+      {hud ? <div data-hud style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
       <SceneErrorBoundary>
         <Canvas camera={{ position: cameraPosition, fov: cameraFov }}>
           {/* Multi-source rig driven by the `lighting` prop. The default rig
