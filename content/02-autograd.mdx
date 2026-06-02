@@ -20,6 +20,14 @@ That's it. No symbolic math, no static graph — the graph is built on the fly a
 
 The 3D sandbox below lets you type an expression, see the live DAG that the `Value` ops build, then play either the forward pulse (data flowing from leaves to root) or the backward pulse (gradients flowing root to leaves). Drag a slider to change a leaf's value and watch the whole graph recompute.
 
+### Reading the graph
+
+- **Layout.** Leaf variables sit on the **left**, each operation to the **right of its inputs**, and the root on the far right. Branches that merge — like `a` and `b` both feeding `+`, then `(a+b)` and `c` feeding `*` — are drawn as branches that visibly come together, so you can see it's a DAG, not a chain.
+- **Backward is progressive.** Press **Backward** and the reveal starts at the root with `root.grad = 1`, then flows outward; each node's `g=…` only appears once the gradient has actually reached it. Nothing shows all the final gradients up front.
+- **Chain rule on the arrows.** Every backward arrow is labelled `incoming grad × local derivative = contribution`. For the default example, the `*` node sends `1 × c = 10` toward `(a+b)` and `1 × (a+b) = -1` toward `c`; `(a+b)` then sends `10 × 1 = 10` to each of `a` and `b`. That is the chain rule, made literal.
+- **Derived ops.** `-` and `/` are tagged **derived**: the engine builds them from primitives (`a - b` is `a + (b·-1)`, `a / b` is `a · b^-1`), so the single node you see folds that internal structure. The gradients are still exact — e.g. the right input of `-` gets a local derivative of `-1`.
+- **Exponents are constants.** `**` only accepts a **numeric literal** exponent (`a ** 3`), shown tagged `const` with no gradient flowing into it. A variable exponent like `a ** b` is rejected, because this engine's `pow` differentiates only the base — accepting it would silently leave `b.grad = 0`.
+
 ## Annotated Code
 
 The `Value` class lives in `src/microgpt_annotated.py`, in the subsection marked `autograd-value-class`:
@@ -59,6 +67,6 @@ The TypeScript port in `src/inference/value.ts` mirrors this one-for-one — sam
 
 ## Sandbox
 
-Type any expression using `+ - * / **`, `relu(x)`, `exp(x)`, `log(x)`, single-letter variables, and parentheses. Hit a preset for a starting point. Drag sliders to change variable values. Scrub the timeline to step through the forward (or backward) pulse.
+Type any expression using `+ - * / **`, `relu(x)`, `exp(x)`, `log(x)`, single-letter variables, and parentheses. Hit a preset for a starting point. Drag sliders to change variable values. Press **Play** to watch the pulse sweep the graph, or scrub the timeline by hand; switching **Forward/Backward** restarts the pulse from the start.
 
 <AutogradSandbox defaultExpression="(a + b) * c" defaultVariables={{ a: 2, b: -3, c: 10 }} />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useGLTF, Html } from '@react-three/drei';
-import { useMemo, useRef, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Color, type Group, type Object3D } from 'three';
 
@@ -48,7 +48,7 @@ function isEmissiveAccent(mat: NonNullable<MeshLike['material']>): boolean {
 
 export interface NodeBlockProps {
   position: [number, number, number];
-  label?: string;
+  label?: ReactNode;
   color?: string;
   glow?: boolean;
   /** Override the emissive accent color (the cyan rim baked into the .glb).

@@ -1,19 +1,21 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
 import { ModeSelector, PlayPauseScrubber, getSandboxPalette } from '@/components/3d/hud';
 import { parse, type AstNode } from '@/src/inference/parser';
 import { buildDag } from './buildDag';
+import { layoutDag } from './layout';
 import { computeNodeActivations, type Phase } from './scheduler';
 
 // Match the resolved Nextra theme without SSR hydration mismatch. Same pattern
 // the primitives gallery uses: server snapshot pins to 'dark', client snapshot
-// reads next-themes after mount. Sandboxes thus follow the page chrome — a
-// hardcoded scheme makes the canvas clash with the rest of the page.
+// reads next-themes after mount.
 const noopSubscribe = () => () => {};
 function useResolvedScheme(): 'light' | 'dark' {
   const { resolvedTheme } = useTheme();
@@ -38,6 +40,12 @@ const MODE_ITEMS = [
   { value: 'bwd', label: 'Backward' },
 ] as const;
 
+const DURATION = 2.4; // seconds for the pulse to sweep the whole graph
+// A node's gradient (backward) / value-pulse (forward) is "revealed" once its
+// activation crosses this — used to gate the progressive backward reveal so the
+// graph does NOT show every final gradient up front.
+const REVEAL = 0.5;
+
 function collectVarNames(src: string): string[] {
   try {
     const names = new Set<string>();
@@ -52,18 +60,79 @@ function collectVarNames(src: string): string[] {
   } catch { return []; }
 }
 
+/** Compact number: trims trailing zeros, caps to 2 decimals. */
+function fmt(n: number): string {
+  if (!Number.isFinite(n)) return '∞';
+  const r = Math.round(n * 100) / 100;
+  return Object.is(r, -0) ? '0' : String(r);
+}
+
+// Pull both ends of an edge in toward each other by `gap` world units so the
+// arrow starts/ends at the node's EDGE instead of its centre — otherwise the
+// big arrowhead overshoots the small cube and poke out its far side (or off the
+// canvas). Returns the trimmed endpoints.
+const NODE_GAP = 0.9;
+function insetEdge(
+  from: [number, number, number],
+  to: [number, number, number],
+  gap = NODE_GAP,
+): { from: [number, number, number]; to: [number, number, number] } {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  // Don't invert very short edges: clamp the trim to under half the length.
+  const g = Math.min(gap, len / 2 - 0.05);
+  return {
+    from: [from[0] + ux * g, from[1] + uy * g, 0],
+    to: [to[0] - ux * g, to[1] - uy * g, 0],
+  };
+}
+
+// Drives t from 0→1 while `playing`, then stops at 1 (holds the final frame).
+// Lives inside the Canvas so it can use useFrame; no setInterval, so the HUD
+// scrubber can pause/seek for free.
+function TimelineClock({ playing, tRef, onTick, onEnd }: {
+  playing: boolean;
+  tRef: React.MutableRefObject<number>;
+  onTick: (t: number) => void;
+  onEnd: () => void;
+}) {
+  useFrame((_, delta) => {
+    if (!playing) return;
+    let next = tRef.current + delta / DURATION;
+    if (next >= 1) { next = 1; tRef.current = 1; onTick(1); onEnd(); return; }
+    tRef.current = next;
+    onTick(next);
+  });
+  return null;
+}
+
 export function AutogradSandbox({ defaultExpression, defaultVariables }: AutogradSandboxProps) {
   const [expr, setExpr] = useState(defaultExpression);
   const [vars, setVars] = useState(defaultVariables);
   const [phase, setPhase] = useState<Phase>('fwd');
-  const [t, setT] = useState(1); // start fully populated for first paint
+  const [t, setT] = useState(1);          // first paint settled (forward, data shown)
+  const [playing, setPlaying] = useState(false);
+  const tRef = useRef(1);
   const scheme = useResolvedScheme();
   const palette = getSandboxPalette('autograd', scheme);
 
-  // Auto-add a 0-valued slot for any new identifier the user types. Done as a
-  // pure derivation (no setState-in-effect) so the lint rule against cascading
-  // renders stays happy. `effectiveVars` is what buildDag and the sliders read;
-  // `setVars` writes back the merged map so the value sticks across edits.
+  // Restart the pulse from the left (forward) / root (backward). Called when the
+  // graph's meaning changes: switching Forward/Backward, or loading a preset.
+  const restartAnim = () => { tRef.current = 0; setT(0); setPlaying(true); };
+  const switchPhase = (next: Phase) => { setPhase(next); restartAnim(); };
+  const loadPreset = (p: { expr: string; vars: Record<string, number> }) => {
+    setExpr(p.expr); setVars(p.vars); restartAnim();
+  };
+  // Play button: if we're parked at the end, rewind before playing.
+  const togglePlay = (next: boolean) => {
+    if (next && tRef.current >= 1) { tRef.current = 0; setT(0); }
+    setPlaying(next);
+  };
+  const seek = (secs: number) => { const nt = secs / DURATION; tRef.current = nt; setT(nt); setPlaying(false); };
+
   const varNames = useMemo(() => collectVarNames(expr), [expr]);
   const effectiveVars = useMemo(() => {
     const merged: Record<string, number> = { ...vars };
@@ -81,6 +150,9 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
     }
   }, [expr, effectiveVars, phase]);
 
+  // layout is independent of t/phase, so memoise on the built dag only.
+  const layout = useMemo(() => (built.dag ? layoutDag(built.dag) : null), [built.dag]);
+
   if (built.error) {
     return (
       <div role="alert" style={{ padding: 12, background: '#fff7f7', border: '1px solid #f5c2c2', borderRadius: 6 }}>
@@ -89,15 +161,16 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
     );
   }
 
-  const { dag } = built;
-  const activations = computeNodeActivations({ topoOrder: dag!.topoOrder, phase }, t);
+  const dag = built.dag!;
+  const pos = layout!.positions;
+  const activations = computeNodeActivations({ topoOrder: dag.topoOrder, phase }, t);
+  const nodeById = Object.fromEntries(dag.nodes.map((n) => [n.id, n]));
 
-  // Lay out nodes left-to-right by topo index, evenly spaced
-  const xSpacing = 1.6;
-  const positions: Record<string, [number, number, number]> = {};
-  dag!.nodes.forEach((n, i) => {
-    positions[n.id] = [(i - (dag!.nodes.length - 1) / 2) * xSpacing, 0, 0];
-  });
+  // Theme-aware pill for the floating edge labels (node labels carry their own
+  // dark pill already, legible on both themes).
+  const labelInk = scheme === 'light' ? '#0f172a' : '#e5edff';
+  const labelBg = scheme === 'light' ? 'rgba(255,247,237,0.92)' : 'rgba(8,10,22,0.82)';
+  const contribTint = scheme === 'light' ? '#b45309' : '#fbbf24';
 
   const hud = (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -109,15 +182,11 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
         style={{ fontFamily: 'monospace', padding: 4, minWidth: 220, background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid #444' }}
       />
       {PRESETS.map((p) => (
-        <button key={p.label} type="button" onClick={() => { setExpr(p.expr); setVars(p.vars); }}>
+        <button key={p.label} type="button" onClick={() => loadPreset(p)}>
           {p.label}
         </button>
       ))}
       {varNames.map((name) => (
-        // Inline labeled slider — uses aria-label="<name>" on the range input so
-        // `getByLabelText(/^a$/)` matches the slider exactly. (ParamSlider from
-        // the Bucket A HUD library wraps the input in a label that includes the
-        // current value text, which defeats the strict regex match in tests.)
         <label key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 6, color: '#fff' }}>
           <span style={{ fontSize: 12 }}>{name}</span>
           <input
@@ -132,51 +201,100 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
           <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{(effectiveVars[name] ?? 0).toFixed(1)}</span>
         </label>
       ))}
-      <ModeSelector
-        items={MODE_ITEMS}
-        value={phase}
-        onChange={setPhase}
-      />
-      <PlayPauseScrubber duration={1} position={t} onSeek={setT} onTogglePlay={() => {}} />
+      <ModeSelector items={MODE_ITEMS} value={phase} onChange={switchPhase} />
+      <PlayPauseScrubber duration={DURATION} position={t * DURATION} onSeek={seek} onTogglePlay={togglePlay} />
       <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12 }}>
-        root = {dag!.root.data.toFixed(3)}
+        root = {dag.root.data.toFixed(3)}
       </span>
     </div>
   );
 
   return (
-    <SceneViewer height="520px" fallbackImage="/microgpt-3d-tutorial/models/previews/autograd.png" hud={hud} bgColor={palette.bg}>
-      {dag!.nodes.map((n) => {
+    <SceneViewer
+      height="520px"
+      fallbackImage="/microgpt-3d-tutorial/models/previews/autograd.png"
+      hud={hud}
+      bgColor={palette.bg}
+      cameraPosition={layout!.camera.position}
+      cameraFov={layout!.camera.fov}
+    >
+      <TimelineClock playing={playing} tRef={tRef} onTick={setT} onEnd={() => setPlaying(false)} />
+
+      {dag.nodes.map((n) => {
         const a = activations[n.id] ?? 0;
-        // Body color stays at palette.body. Activation is signaled by `glow`
-        // (emissive accent pulse) and by the lit arrows feeding the node — NOT
-        // by swapping body to palette.accent, which would (and previously did)
-        // wipe out the body color whenever the scrubber sits at t=1, because
-        // every node is then "fully active".
+        // Backward: reveal the gradient only once the wavefront (root → leaves)
+        // has reached this node, so the reader watches grads propagate instead
+        // of seeing all final grads at t=0.
+        const showGrad = phase === 'bwd' && a > REVEAL;
+        const tag = n.kind === 'const' ? 'const' : n.derived ? 'derived' : null;
+        const label = (
+          <div style={{ textAlign: 'center', lineHeight: 1.12, whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 700, fontSize: 17 }}>{n.label}</div>
+            <div style={{ fontSize: 13, opacity: 0.95 }}>={fmt(n.value.data)}</div>
+            {showGrad && <div style={{ fontSize: 13, color: contribTint, fontWeight: 700 }}>g={fmt(n.value.grad)}</div>}
+            {tag && <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: 0.3 }}>{tag}</div>}
+          </div>
+        );
         return (
           <NodeBlock
             key={n.id}
-            position={positions[n.id]}
-            label={`${n.label}\n${n.value.data.toFixed(2)} | g=${n.value.grad.toFixed(2)}`}
+            position={pos[n.id]}
+            label={label}
             color={palette.body}
             accentColor={palette.accent}
-            accentStrength={a > 0.5 ? 1.0 : 0.4}
+            accentStrength={a > REVEAL ? 1.0 : 0.4}
             glow={a > 0.8}
           />
         );
       })}
-      {dag!.edges.map((e, i) => {
-        const fromActive = (activations[e.from] ?? 0) > 0.5;
-        const toActive = (activations[e.to] ?? 0) > 0;
-        const lit = fromActive && toActive;
+
+      {dag.edges.map((e, i) => {
+        const parentA = activations[e.to] ?? 0;
+        const childA = activations[e.from] ?? 0;
+        const lit = phase === 'bwd'
+          ? parentA > REVEAL && !e.constant         // grad flowing parent → child
+          : childA > REVEAL && parentA > 0;         // data flowing child → parent
+        const arrowColor = e.constant
+          ? palette.edge
+          : lit ? palette.accent : palette.edge;
+        const trimmed = insetEdge(pos[e.from], pos[e.to]);
         return (
           <ConnectorArrow
-            key={i}
-            from={positions[e.from]}
-            to={positions[e.to]}
-            color={lit ? palette.accent : palette.edge}
+            key={`arrow-${i}`}
+            from={trimmed.from}
+            to={trimmed.to}
+            color={arrowColor}
             direction={phase === 'bwd' ? 'bwd' : 'fwd'}
           />
+        );
+      })}
+
+      {/* Chain-rule readout on each backward edge: incoming grad × local
+          derivative = contribution. Skips the constant exponent edge. Appears as
+          the wavefront reaches the parent, so the numbers light up root→leaves. */}
+      {phase === 'bwd' && dag.edges.map((e, i) => {
+        if (e.constant) return null;
+        if ((activations[e.to] ?? 0) <= REVEAL) return null;
+        const parent = nodeById[e.to];
+        const incoming = parent.value.grad;
+        const contrib = incoming * e.localGrad;
+        const { from, to } = insetEdge(pos[e.from], pos[e.to]);
+        // Sit the label ~40% of the way from the parent toward the child, lifted
+        // slightly so it doesn't overlap the arrow shaft.
+        const lx = to[0] + (from[0] - to[0]) * 0.42;
+        const ly = to[1] + (from[1] - to[1]) * 0.42 + 0.32;
+        const pillStyle: CSSProperties = {
+          pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
+          fontFamily: 'monospace', fontSize: 12, fontWeight: 600,
+          color: labelInk, background: labelBg,
+          padding: '1px 6px', borderRadius: 5,
+          boxShadow: '0 0 0 1px rgba(120,120,140,0.25)',
+        };
+        return (
+          <Html key={`elabel-${i}`} position={[lx, ly, 0]} center distanceFactor={9} style={pillStyle}>
+            <span>{fmt(incoming)} × {fmt(e.localGrad)} = </span>
+            <span style={{ color: contribTint, fontWeight: 700 }}>{fmt(contrib)}</span>
+          </Html>
         );
       })}
     </SceneViewer>

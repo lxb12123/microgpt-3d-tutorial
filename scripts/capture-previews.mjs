@@ -6,11 +6,15 @@ import { chromium } from '@playwright/test';
 
 const PORT = 4192;
 const BASE = `http://127.0.0.1:${PORT}/microgpt-3d-tutorial`;
-const TARGETS = [
+// ROUTES env (comma-separated route prefixes) narrows what gets re-captured,
+// e.g. ROUTES=02-autograd to refresh only that preview without churning others.
+const ALL_TARGETS = [
   { route: '01-overview', out: 'public/models/previews/overview.png' },
   { route: '02-autograd', out: 'public/models/previews/autograd.png' },
   { route: '03-attention', out: 'public/models/previews/attention.png' },
 ];
+const ROUTES = process.env.ROUTES?.split(',');
+const TARGETS = ROUTES ? ALL_TARGETS.filter((t) => ROUTES.includes(t.route)) : ALL_TARGETS;
 
 function serve() {
   return spawn('sh', ['-c',
