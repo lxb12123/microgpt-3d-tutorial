@@ -13,12 +13,13 @@ vi.mock('@react-three/drei', () => {
   return {
     useGLTF,
     Html: ({ children }: { children: React.ReactNode }) => <div data-testid="html">{children}</div>,
+    Text: ({ children }: { children: React.ReactNode }) => <div data-testid="scene-text">{children}</div>,
   };
 });
 
 describe('TokenCube', () => {
   it('renders the character label', () => {
     render(<TokenCube position={[0, 0, 0]} char="a" color="#88ccff" />);
-    expect(screen.getByTestId('html')).toHaveTextContent('a');
+    expect(screen.getByTestId('scene-text')).toHaveTextContent('a');
   });
 });

@@ -17,6 +17,7 @@ vi.mock('@react-three/drei', () => {
   return {
     useGLTF,
     Html: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Text: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     OrbitControls: () => null,
     Instances: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Instance: () => null,
