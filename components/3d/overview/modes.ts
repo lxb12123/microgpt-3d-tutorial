@@ -50,18 +50,30 @@ export function sampleFromDistribution(probs: number[], seed: number): number {
  *
  * The window width `0.18` means an element ramps from 0→1 over the first ~18%
  * of the clock after the wavefront reaches it, then stays lit. `stageStart` is
- * where each lane begins so tokens light first, then the GPT block, then the
- * probability bar — data visibly flowing through the pipeline.
+ * where each lane begins so tokens light first, then the MODEL block, then the
+ * probability bars — data visibly flowing through the pipeline.
  */
 export interface OverviewSchedule {
-  /** Per-input-token activation 0..1 (left → right reveal). */
+  /** Per-input-token reveal 0..1 (left → right). */
   tokenActivation: number[];
-  /** GPT-block attention grid activation 0..1 (lights after tokens). */
-  blockActivation: number;
-  /** Per-probability-cell fill fraction 0..1 (bars grow after the block). */
+  /** Pulse traveling input → MODEL, 0..1. */
+  flowIn: number;
+  /** MODEL box ignition 0..1. */
+  modelActivation: number;
+  /** Pulse traveling MODEL → bars, 0..1. */
+  flowOut: number;
+  /** Per-bar grow fraction 0..1 (forward/sample). */
   barActivation: number[];
-  /** Sample-mode: 0 until the draw fires, then 0..1 as the char flies back. */
-  sampleProgress: number;
+  /** Loss: number of columns whose ✓/✗ has been revealed (0..tokenCount). */
+  lossRevealed: number;
+  /** Loss: index of the currently focused column, or -1. */
+  lossFocusCol: number;
+  /** Loss: average-loss line fade-in 0..1. */
+  showAverage: number;
+  /** Sample: draw-marker scan 0..1. */
+  drawProgress: number;
+  /** Sample: chosen char fly-to-input 0..1. */
+  flyProgress: number;
 }
 
 export interface ProbBar {
@@ -167,29 +179,40 @@ export function computeOverviewSchedule(
   tokenCount: number,
   barCount: number,
 ): OverviewSchedule {
-  // Three lanes spread across the clock: tokens reveal over [0, ~0.45], the GPT
-  // block lights at ~0.5, bars fill over [0.55, 1.0]. Each lane's LAST element
-  // must finish ramping inside the lane window, so the latest start is
-  // (windowEnd - RAMP) and the spread divides by (count-1) — that maps the last
-  // index exactly onto the latest start instead of overshooting past t=1.
-  const tokenLatestStart = 0.45 - RAMP;
+  const tokenLatestStart = 0.30 - RAMP;
   const tokenActivation = Array.from({ length: tokenCount }, (_, i) => {
-    const start = tokenCount > 1 ? (i / (tokenCount - 1)) * tokenLatestStart : 0;
+    const start = tokenCount > 1 ? (i / (tokenCount - 1)) * Math.max(tokenLatestStart, 0) : 0;
     return ramp(t, start);
   });
 
-  const blockActivation = ramp(t, 0.5);
+  const flowIn = ramp(t, 0.30);
+  const modelActivation = ramp(t, 0.40);
+  const flowOut = ramp(t, 0.52);
 
+  const barStart = 0.60;
   const barLatestStart = 1 - RAMP;
-  const barSpread = barLatestStart - 0.55;
+  const barSpread = barLatestStart - barStart;
   const barActivation = Array.from({ length: barCount }, (_, i) => {
-    const start = barCount > 1 ? 0.55 + (i / (barCount - 1)) * barSpread : 0.55;
+    const start = barCount > 1 ? barStart + (i / (barCount - 1)) * barSpread : barStart;
     return ramp(t, start);
   });
 
-  // Sample mode: the chosen character lifts off the bar and flies back to the
-  // input row only in the final quarter of the clock.
-  const sampleProgress = mode === 'sample' ? ramp(t, 0.7) : 0;
+  let lossRevealed = 0;
+  let lossFocusCol = -1;
+  let showAverage = 0;
+  if (mode === 'loss') {
+    const lossT = (t - 0.55) / (0.82 - 0.55);
+    const clamped = Math.min(Math.max(lossT, 0), 1);
+    lossRevealed = Math.round(clamped * tokenCount);
+    lossFocusCol = clamped <= 0 ? -1 : Math.min(tokenCount - 1, Math.floor(clamped * tokenCount));
+    showAverage = ramp(t, 0.82);
+  }
 
-  return { tokenActivation, blockActivation, barActivation, sampleProgress };
+  const drawProgress = mode === 'sample' ? ramp(t, 0.62) : 0;
+  const flyProgress = mode === 'sample' ? ramp(t, 0.82) : 0;
+
+  return {
+    tokenActivation, flowIn, modelActivation, flowOut, barActivation,
+    lossRevealed, lossFocusCol, showAverage, drawProgress, flyProgress,
+  };
 }

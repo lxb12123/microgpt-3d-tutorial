@@ -47,37 +47,47 @@ describe('overview modes', () => {
 
 describe('computeOverviewSchedule', () => {
   it('at t=0 nothing is lit', () => {
-    const s = computeOverviewSchedule(0, 'forward', 4, 12);
+    const s = computeOverviewSchedule(0, 'forward', 4, 5);
     expect(s.tokenActivation.every((v) => v === 0)).toBe(true);
-    expect(s.blockActivation).toBe(0);
+    expect(s.modelActivation).toBe(0);
     expect(s.barActivation.every((v) => v === 0)).toBe(true);
-    expect(s.sampleProgress).toBe(0);
+    expect(s.flowIn).toBe(0);
+    expect(s.flowOut).toBe(0);
   });
 
-  it('at t=1 everything is fully lit', () => {
-    const s = computeOverviewSchedule(1, 'forward', 4, 12);
+  it('at t=1 the pipeline is fully lit', () => {
+    const s = computeOverviewSchedule(1, 'forward', 4, 5);
     expect(s.tokenActivation.every((v) => v === 1)).toBe(true);
-    expect(s.blockActivation).toBe(1);
+    expect(s.modelActivation).toBe(1);
     expect(s.barActivation.every((v) => v === 1)).toBe(true);
   });
 
-  it('reveals left-to-right: earlier tokens lead later tokens', () => {
-    // Mid-clock, the first token should be more lit than the last.
-    const s = computeOverviewSchedule(0.25, 'forward', 4, 12);
+  it('reveals tokens left-to-right', () => {
+    const s = computeOverviewSchedule(0.15, 'forward', 4, 5);
     expect(s.tokenActivation[0]).toBeGreaterThan(s.tokenActivation[3]);
   });
 
-  it('lane ordering: tokens lead the block, block leads the bars', () => {
-    // At t=0.5 tokens are done, the block is just igniting, bars still dark.
-    const s = computeOverviewSchedule(0.5, 'forward', 4, 12);
+  it('orders the lanes: tokens → flowIn → model → flowOut → bars', () => {
+    const s = computeOverviewSchedule(0.45, 'forward', 4, 5);
     expect(s.tokenActivation[0]).toBe(1);
+    expect(s.modelActivation).toBeGreaterThan(0);
     expect(s.barActivation.every((v) => v === 0)).toBe(true);
   });
 
-  it('sampleProgress only advances in sample mode and only late in the clock', () => {
-    expect(computeOverviewSchedule(0.5, 'sample', 4, 12).sampleProgress).toBe(0);
-    expect(computeOverviewSchedule(1, 'sample', 4, 12).sampleProgress).toBe(1);
-    expect(computeOverviewSchedule(1, 'forward', 4, 12).sampleProgress).toBe(0);
+  it('loss: columns check off progressively and the average appears at the end', () => {
+    expect(computeOverviewSchedule(0.6, 'loss', 4, 5).lossRevealed).toBeLessThan(4);
+    const end = computeOverviewSchedule(1, 'loss', 4, 5);
+    expect(end.lossRevealed).toBe(4);
+    expect(end.showAverage).toBeCloseTo(1, 6);
+    expect(computeOverviewSchedule(0.6, 'loss', 4, 5).showAverage).toBe(0);
+  });
+
+  it('sample: draw scans then fly completes, only in sample mode', () => {
+    expect(computeOverviewSchedule(1, 'forward', 4, 5).flyProgress).toBe(0);
+    const end = computeOverviewSchedule(1, 'sample', 4, 5);
+    expect(end.drawProgress).toBe(1);
+    expect(end.flyProgress).toBe(1);
+    expect(computeOverviewSchedule(0.5, 'sample', 4, 5).flyProgress).toBe(0);
   });
 });
 
