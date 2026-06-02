@@ -64,7 +64,47 @@ export interface OverviewSchedule {
   sampleProgress: number;
 }
 
-const RAMP = 0.18;
+export interface ProbBar {
+  /** Display label: a vocab char, the literal "BOS", or "other". */
+  char: string;
+  /** Probability mass for this bar (the "other" bar aggregates the tail). */
+  prob: number;
+  /** Vocab index for real bars; -1 for the "other" aggregate. */
+  index: number;
+  isOther: boolean;
+}
+
+/**
+ * Collapse a full last-position distribution into the top-`topK` characters by
+ * probability plus a single "other" bar holding the remaining mass — so the
+ * scene shows a readable handful of labeled bars instead of ~27 slivers. The
+ * BOS index renders as the literal "BOS".
+ */
+export function buildProbBars(
+  probs: number[],
+  vocab: string[],
+  bosId: number,
+  topK: number,
+): ProbBar[] {
+  const ranked = probs
+    .map((prob, index) => ({ index, prob }))
+    .sort((a, b) => b.prob - a.prob || b.index - a.index);
+  const top = ranked.slice(0, topK);
+  const rest = ranked.slice(topK);
+
+  const label = (index: number) => (index === bosId ? 'BOS' : vocab[index] ?? '?');
+  const bars: ProbBar[] = top.map(({ index, prob }) => ({
+    char: label(index), prob, index, isOther: false,
+  }));
+
+  const otherMass = rest.reduce((a, r) => a + r.prob, 0);
+  if (rest.length > 0 && otherMass > 1e-9) {
+    bars.push({ char: 'other', prob: otherMass, index: -1, isOther: true });
+  }
+  return bars;
+}
+
+export const RAMP = 0.18;
 
 /** Smoothstep ramp: 0 below `start`, 1 above `start+RAMP`, eased in between. */
 function ramp(t: number, start: number): number {

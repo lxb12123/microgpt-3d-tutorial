@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  averageLoss,
+  buildLossColumns,
+  buildProbBars,
   computeLossMarks,
   computeOverviewSchedule,
   sampleFromDistribution,
@@ -75,5 +78,34 @@ describe('computeOverviewSchedule', () => {
     expect(computeOverviewSchedule(0.5, 'sample', 4, 12).sampleProgress).toBe(0);
     expect(computeOverviewSchedule(1, 'sample', 4, 12).sampleProgress).toBe(1);
     expect(computeOverviewSchedule(1, 'forward', 4, 12).sampleProgress).toBe(0);
+  });
+});
+
+describe('buildProbBars', () => {
+  const vocab = ['.', 'a', 'n', 's', 'x', 'y']; // index 0 is BOS/'.'
+  const probs = [0.05, 0.12, 0.41, 0.18, 0.10, 0.14];
+
+  it('returns the top-K chars by probability plus one aggregated "other" bar', () => {
+    const bars = buildProbBars(probs, vocab, 0, 3);
+    expect(bars.map((b) => b.char)).toEqual(['n', 's', 'y', 'other']);
+    expect(bars[3].isOther).toBe(true);
+    expect(bars[3].prob).toBeCloseTo(0.27, 6);
+  });
+
+  it('bars (incl. other) sum to ~1', () => {
+    const bars = buildProbBars(probs, vocab, 0, 3);
+    const sum = bars.reduce((a, b) => a + b.prob, 0);
+    expect(sum).toBeCloseTo(1, 6);
+  });
+
+  it('omits the "other" bar when topK already covers the vocab', () => {
+    const bars = buildProbBars([0.5, 0.5], ['.', 'a'], 0, 5);
+    expect(bars.map((b) => b.char)).toEqual(['a', 'BOS']);
+    expect(bars.some((b) => b.isOther)).toBe(false);
+  });
+
+  it('renders the BOS index as the literal "BOS"', () => {
+    const bars = buildProbBars([0.9, 0.1], ['.', 'a'], 0, 1);
+    expect(bars[0].char).toBe('BOS');
   });
 });
