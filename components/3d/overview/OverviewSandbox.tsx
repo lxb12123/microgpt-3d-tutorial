@@ -104,13 +104,20 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const inferenceError = computed && !computed.ok ? computed.error : null;
   const tokenizer = ok?.tokenizer ?? new Tokenizer(weights._vocab);
 
+  // The sentinel at the input start is START; the same token predicted as the
+  // NEXT character means STOP (end of sequence). Only the input start is shown
+  // here, so it always reads START.
   const inputChars = (ok?.ids ?? []).map((id) =>
-    id === tokenizer.bosId ? 'BOS' : tokenizer.vocab[id] ?? '?');
+    id === tokenizer.bosId ? 'START' : tokenizer.vocab[id] ?? '?');
   const bars = ok?.bars ?? [];
   const tokenCount = inputChars.length;
 
   const schedule = computeOverviewSchedule(t, mode, tokenCount, bars.length);
 
+  // Sample-mode draw: did the model draw the STOP sentinel (→ generation ends)?
+  // Was the drawn char hidden inside the aggregated "other" bar?
+  const isStop = !!ok && ok.sampledIdx === tokenizer.bosId;
+  const fromOther = !!ok && !isStop && !bars.some((b) => b.index === ok.sampledIdx);
   const chosenBarIndex = (() => {
     if (!ok) return 0;
     const hit = bars.findIndex((b) => b.index === ok.sampledIdx);
@@ -118,9 +125,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
     const other = bars.findIndex((b) => b.isOther);
     return other >= 0 ? other : bars.length - 1;
   })();
-  const chosenChar = ok && ok.sampledIdx === tokenizer.bosId
-    ? 'BOS'
-    : (ok ? tokenizer.vocab[ok.sampledIdx] ?? '?' : '?');
+  const chosenChar = isStop ? 'STOP' : (ok ? tokenizer.vocab[ok.sampledIdx] ?? '?' : '?');
 
   const hud = (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -137,7 +142,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
         onTogglePlay={setPlaying} />
       {mode === 'sample' && ok && (
         <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12 }}>
-          sampled: {chosenChar}{' '}
+          sampled: {chosenChar}{isStop ? ' (generation ends)' : fromOther ? ' (from other)' : ''}{' '}
           <button type="button" onClick={() => { setSampleSeed(Math.random()); restartSweep(); }}
             style={{ fontSize: 11, marginLeft: 4 }}>resample</button>
         </span>
@@ -167,10 +172,10 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
 
       {ok && (
         <group scale={0.58} position={[-0.35, 0.15, 0]}>
-          <SceneText position={[0, 2.5, 0]} fontSize={0.34} color={theme.tint} letterSpacing={0.08}>
+          <SceneText position={[0, 2.5, 0]} fontSize={0.42} color={theme.tint} letterSpacing={0.08}>
             {theme.title}
           </SceneText>
-          <SceneText position={[0, 2.05, 0]} fontSize={0.17} color="#cbd5e1" maxWidth={9}>
+          <SceneText position={[0, 2.0, 0]} fontSize={0.21} color="#cbd5e1" maxWidth={9}>
             {theme.subtitle}
           </SceneText>
 
@@ -181,7 +186,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
               <ModelBox activation={schedule.modelActivation} palette={palette} />
               <FlowArrow x0={1.2} x1={barX(0) - 0.4} flow={schedule.flowOut} />
               <ProbBars bars={bars} activation={schedule.barActivation} palette={palette} />
-              <SceneText position={[(barX(0) + lastBarX) / 2, -1.35, 0]} fontSize={0.15} color="#94a3b8">
+              <SceneText position={[(barX(0) + lastBarX) / 2, -1.4, 0]} fontSize={0.18} color="#94a3b8">
                 next-character probabilities
               </SceneText>
             </>
@@ -189,6 +194,7 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
 
           {mode === 'sample' && (
             <SampleOverlay bars={bars} chosenBarIndex={chosenBarIndex} chosenChar={chosenChar}
+              isStop={isStop} fromOther={fromOther}
               drawProgress={schedule.drawProgress} flyProgress={schedule.flyProgress}
               tokenCount={tokenCount} palette={palette} />
           )}

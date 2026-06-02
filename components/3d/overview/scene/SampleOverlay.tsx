@@ -7,16 +7,21 @@ import type { ProbBar } from '../modes';
 
 /**
  * Sample overlay (drawn on top of the Pipeline bars): an orange marker scans the
- * bars during `drawProgress`, then the chosen character flies from its bar to
- * the input tail during `flyProgress`. If the drawn index isn't a visible bar it
- * flies from the "other" bar. A loop hint points back toward MODEL.
+ * bars during `drawProgress`, then the outcome plays out during `flyProgress`:
+ *  - normal char → the character flies from its bar to the input tail, and a
+ *    "repeat" loop hints that generation continues. If it came from the
+ *    aggregated "other" bar, a "drawn from other: x" note is shown.
+ *  - STOP sentinel → no character is appended; "generation stops" is shown,
+ *    because predicting the sentinel as the next token ends the sequence.
  */
 export function SampleOverlay({
-  bars, chosenBarIndex, chosenChar, drawProgress, flyProgress, tokenCount, palette,
+  bars, chosenBarIndex, chosenChar, isStop, fromOther, drawProgress, flyProgress, tokenCount, palette,
 }: {
   bars: ProbBar[];
   chosenBarIndex: number;
   chosenChar: string;
+  isStop: boolean;
+  fromOther: boolean;
   drawProgress: number;
   flyProgress: number;
   tokenCount: number;
@@ -36,39 +41,57 @@ export function SampleOverlay({
 
   return (
     <>
-      {drawProgress > 0 && flyProgress < 0.05 && (
+      {drawProgress > 0 && (isStop || flyProgress < 0.05) && (
         <group position={[markerX, BAR_BASE_Y + BAR_MAX_H + 0.7, 0]}>
           <mesh rotation={[0, 0, Math.PI]}>
-            <coneGeometry args={[0.14, 0.3, 12]} />
+            <coneGeometry args={[0.16, 0.34, 12]} />
             <meshBasicMaterial color="#f59e0b" />
           </mesh>
           {markerSettled && (
-            <SceneText position={[0, 0.35, 0]} fontSize={0.16} color="#f59e0b">draw</SceneText>
+            <SceneText position={[0, 0.4, 0]} fontSize={0.2} color="#f59e0b">draw</SceneText>
           )}
         </group>
       )}
 
-      {flyProgress > 0 && (
+      {/* STOP: the model drew the sentinel → end of sequence, nothing appended.
+          Placed in the clear area above MODEL (where the repeat hint would go). */}
+      {isStop && markerSettled && (
+        <SceneText position={[0.6, 1.5, 0]} fontSize={0.24}
+          color="#f87171" anchorX="center" maxWidth={6} textAlign="center">
+          STOP → generation ends
+        </SceneText>
+      )}
+
+      {/* Normal draw: the character flies to the input tail. */}
+      {!isStop && flyProgress > 0 && (
         <group position={[fx, fy, 0.1]} scale={0.7}>
           <TokenCube position={[0, 0, 0]} char={chosenChar}
             color={palette.highlight} accentColor="#f59e0b" accentStrength={1.2}
-            labelSize={chosenChar.length > 1 ? 0.16 : 0.3} />
+            labelSize={chosenChar.length > 1 ? 0.2 : 0.34} />
         </group>
+      )}
+
+      {/* If the drawn char was hidden inside the aggregated "other" bar, name it. */}
+      {!isStop && fromOther && drawProgress > 0.4 && (
+        <SceneText position={[barX(chosenBarIndex), BAR_BASE_Y + BAR_MAX_H + 1.15, 0]} fontSize={0.18}
+          color="#f59e0b" anchorX="center">
+          {`drawn from other: ${chosenChar}`}
+        </SceneText>
       )}
 
       {/* Loop-back "repeat" hint — drawn as a curved arrow (the bundled mono
           font has no ↻ glyph) plus a label, to show generation is iterative. */}
-      {flyProgress > 0.85 && (
+      {!isStop && flyProgress > 0.85 && (
         <group position={[0.55, 1.55, 0]}>
           <mesh rotation={[0, 0, Math.PI * 0.2]}>
-            <torusGeometry args={[0.16, 0.028, 8, 24, Math.PI * 1.5]} />
+            <torusGeometry args={[0.18, 0.032, 8, 24, Math.PI * 1.5]} />
             <meshBasicMaterial color="#f59e0b" />
           </mesh>
-          <mesh position={[0.18, 0.13, 0]} rotation={[0, 0, -Math.PI * 0.1]}>
-            <coneGeometry args={[0.07, 0.14, 10]} />
+          <mesh position={[0.2, 0.15, 0]} rotation={[0, 0, -Math.PI * 0.1]}>
+            <coneGeometry args={[0.08, 0.16, 10]} />
             <meshBasicMaterial color="#f59e0b" />
           </mesh>
-          <SceneText position={[0.42, 0, 0]} fontSize={0.16} color="#f59e0b" anchorX="left">
+          <SceneText position={[0.48, 0, 0]} fontSize={0.2} color="#f59e0b" anchorX="left">
             repeat
           </SceneText>
         </group>

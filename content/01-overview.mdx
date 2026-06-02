@@ -10,7 +10,7 @@ This whole lesson fits in one sentence:
 
 Three views of that loop — each is a mode you can drive in the sandbox below. Every clip shows the same pipeline: **input characters → the MODEL → a probability for each possible next character.**
 
-**Forward** — the model reads the characters and predicts a probability for *every* possible next character. The bars on the right are that distribution (the most likely few, plus an `other` bar for the rest). The point: the model outputs a distribution, not a single answer.
+**Forward** — the model reads the characters and predicts a probability for *every* possible next character. The bars on the right are that distribution: the most likely few, plus a neutral `other` bar that is the *combined* probability of all characters not shown individually (a sum, not a single candidate). One special token is a sentinel: at the very start of the input it means **START**, and when the model predicts it as the *next* character it means **STOP** — end of text. The point: the model outputs a distribution, not a single answer.
 
 <img src="/microgpt-3d-tutorial/diagrams/overview-forward-light.gif" alt="Forward: input characters feed a MODEL box; on the right, labeled bars show the probability of each next character, tallest highlighted" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 <img src="/microgpt-3d-tutorial/diagrams/overview-forward-dark.gif" alt="Forward: input characters feed a MODEL box; on the right, labeled bars show the probability of each next character, tallest highlighted" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
@@ -20,10 +20,10 @@ Three views of that loop — each is a mode you can drive in the sandbox below. 
 <img src="/microgpt-3d-tutorial/diagrams/overview-loss-light.gif" alt="Loss: input characters aligned to their true next characters, each column marked with a green check or red cross, ending in the average loss" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 <img src="/microgpt-3d-tutorial/diagrams/overview-loss-dark.gif" alt="Loss: input characters aligned to their true next characters, each column marked with a green check or red cross, ending in the average loss" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
-**Sample** — at the last position, draw one character *at random according to the probabilities* (not always the most likely one), append it to the input, and repeat to generate text.
+**Sample** — at the last position, draw one character *at random according to the probabilities* (not always the most likely one), append it to the input, and repeat to generate text. If the draw lands in the `other` bar, the actual hidden character is appended; if it draws the **STOP** sentinel, generation ends.
 
-<img src="/microgpt-3d-tutorial/diagrams/overview-sample-light.gif" alt="Sample: an orange marker draws one character from the probability bars; the chosen character flies to the end of the input row" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
-<img src="/microgpt-3d-tutorial/diagrams/overview-sample-dark.gif" alt="Sample: an orange marker draws one character from the probability bars; the chosen character flies to the end of the input row" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-light.gif" alt="Sample: an orange marker draws one token from the probability bars; a normal character flies to the end of the input row, while drawing the STOP sentinel ends generation" loading="lazy" className="dark:hidden" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
+<img src="/microgpt-3d-tutorial/diagrams/overview-sample-dark.gif" alt="Sample: an orange marker draws one token from the probability bars; a normal character flies to the end of the input row, while drawing the STOP sentinel ends generation" loading="lazy" className="hidden dark:block" style={{ width: '100%', maxWidth: 480, borderRadius: 12, margin: '12px 0' }} />
 
 The 02 lesson zooms into the autograd that makes "learn from loss" possible. The 03 lesson zooms into the self-attention block. This one keeps the bird's-eye view.
 

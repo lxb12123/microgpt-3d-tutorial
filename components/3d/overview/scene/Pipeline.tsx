@@ -65,7 +65,7 @@ export function ModelBox({ activation, palette }: { activation: number; palette:
           roughness={0.6}
         />
       </mesh>
-      <SceneText position={[0, 0, 0.5]} fontSize={0.26} color="#ffffff" outlineWidth={0.02}>
+      <SceneText position={[0, 0, 0.5]} fontSize={0.3} color="#ffffff" outlineWidth={0.02}>
         MODEL
       </SceneText>
     </group>
@@ -99,34 +99,48 @@ export function FlowArrow({
   );
 }
 
-/** Vertical probability bars with char + % labels; tallest highlighted. */
+// Neutral slate for the aggregated "other" bar — it's a sum of un-shown chars,
+// not a single candidate, so it's never coloured like a real prediction.
+const OTHER_COLOR = '#5b6679';
+
+/** Vertical probability bars with char + % labels. The tallest *single real
+ *  token* is highlighted (the "other" aggregate is excluded — it isn't one
+ *  character you could draw, so it must not read as the model's top answer). */
 export function ProbBars({
   bars, activation, palette,
 }: { bars: ProbBar[]; activation: number[]; palette: PaletteLike }) {
   const peak = Math.max(...bars.map((b) => b.prob), 1e-6);
-  const topIdx = bars.reduce((best, b, i, arr) => (b.prob > arr[best].prob ? i : best), 0);
+  let topIdx = -1;
+  let topProb = -Infinity;
+  bars.forEach((b, i) => { if (!b.isOther && b.prob > topProb) { topProb = b.prob; topIdx = i; } });
   return (
     <>
       {bars.map((b, i) => {
         const act = activation[i] ?? 0;
         const fullH = (b.prob / peak) * BAR_MAX_H;
         const h = Math.max(fullH * act, 0.001);
-        const color = i === topIdx ? palette.highlight : palette.accent;
+        const isTop = i === topIdx;
+        const color = b.isOther ? OTHER_COLOR : (isTop ? palette.highlight : palette.accent);
         const x = barX(i);
         return (
           <group key={i} position={[x, 0, 0]}>
             <mesh position={[0, BAR_BASE_Y + h / 2, 0]} scale={[1, h, 1]}>
               <boxGeometry args={[0.4, 1, 0.4]} />
-              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} />
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={b.isOther ? 0.05 : 0.25}
+              />
             </mesh>
-            <SceneText position={[0, BAR_BASE_Y - 0.28, 0]} fontSize={b.isOther ? 0.16 : 0.24}>
+            <SceneText position={[0, BAR_BASE_Y - 0.3, 0]} fontSize={b.isOther ? 0.2 : 0.28}
+              color={b.isOther ? '#94a3b8' : '#e5edff'}>
               {b.char}
             </SceneText>
             {act > 0.15 && (
               <SceneText
-                position={[0, BAR_BASE_Y + fullH + 0.25, 0]}
-                fontSize={0.18}
-                color={i === topIdx ? palette.highlight : '#cbd5e1'}
+                position={[0, BAR_BASE_Y + fullH + 0.28, 0]}
+                fontSize={0.22}
+                color={isTop ? palette.highlight : b.isOther ? '#94a3b8' : '#cbd5e1'}
               >
                 {`${Math.round(b.prob * 100)}%`}
               </SceneText>

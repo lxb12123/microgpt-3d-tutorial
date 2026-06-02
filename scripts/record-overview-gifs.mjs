@@ -98,6 +98,20 @@ async function captureClip(page, scheme, mode) {
   const label = mode[0].toUpperCase() + mode.slice(1);
   await page.getByRole('radio', { name: label }).click();
   await page.waitForTimeout(900); // let troika generate this mode's SDF glyphs
+
+  // Canonical sample clip: resample until the draw is a normal single visible
+  // character, so the GIF tells the core draw→append→repeat story. (STOP and
+  // "drawn from other" are edge cases — explained in the copy and the live
+  // sandbox — and would otherwise show up at random for the "anna" preset.)
+  if (mode === 'sample') {
+    const span = page.locator('[data-hud] span', { hasText: 'sampled' });
+    for (let r = 0; r < 30; r++) {
+      const txt = await span.innerText().catch(() => '');
+      if (/sampled:/.test(txt) && !/STOP/.test(txt) && !/from other/.test(txt)) break;
+      await page.getByRole('button', { name: 'resample' }).click();
+      await page.waitForTimeout(200);
+    }
+  }
   await setHud(page, 'hidden');
 
   const canvas = page.locator('canvas').first();
