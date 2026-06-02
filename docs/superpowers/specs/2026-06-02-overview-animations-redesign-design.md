@@ -39,12 +39,14 @@ crisp and every claim honest. Decisions confirmed with the user:
 Left → right pipeline:
 
 ```
-[·][a][n][n][a]  ──▶   ┌─────────┐   ──▶    n  ▌▌▌▌▌ 41%
- input characters       │  MODEL  │          a  ▌ 12%
- (· = start token)      └─────────┘          s  ▌▌ 18%
-                                          other ▌▌▌ 29%
-                                       next-character probabilities
+[BOS][a][n][n][a]  ──▶   ┌─────────┐   ──▶    n  ▌▌▌▌▌ 41%
+ input characters         │  MODEL  │          a  ▌ 12%
+ (BOS = start token)      └─────────┘          s  ▌▌ 18%
+                                            other ▌▌▌ 29%
+                                         next-character probabilities
 ```
+
+The start token renders as the literal text `BOS` (not a `·` glyph).
 
 - All text via drei `<Text>` (SDF). No `<Html>` for in-scene labels.
 - Right side = real last-position distribution from live inference: **top ~4 characters
@@ -67,8 +69,8 @@ Left → right pipeline:
 - Subtitle: "Compare each prediction with the true next character."
 - Two aligned rows:
   ```
-  Input:  [·] [a] [n] [n]
-  Truth:   [a]  [n] [n] [a]
+  Input:  [BOS] [a] [n] [n]
+  Truth:    [a]  [n] [n] [a]
   ```
 - Per column: green ✓ when the model's top-1 == truth, red ✗ otherwise (from
   `computeLossMarks`). **Input cubes are never painted red.**
@@ -81,7 +83,7 @@ Left → right pipeline:
 ### Sample
 - Subtitle: "Draw one character from the distribution → append it → repeat."
 - An orange marker performs a weighted draw across the bars (can land on `other`).
-- The drawn char cube flies from its bar to the input tail → `[·][a][n][n][a][s]`.
+- The drawn char cube flies from its bar to the input tail → `[BOS][a][n][n][a][s]`.
 - A loop arrow points from the new input back to MODEL.
 - If the drawn char isn't one of the shown bars, it flies from the **`other`** bar (not
   from the last visible char bar).
