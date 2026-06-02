@@ -122,13 +122,22 @@ export function LossView({
         );
       })}
 
-      {/* Focused-column callout, placed in the empty space to the right —
-          three short lines so it stays readable in a 480px GIF. */}
+      {/* Focused-column callout, placed in the empty space to the right. The
+          model's top guess leads (in the amber "model's answer" colour) so a ✗
+          reads as "guessed a, truth was n" — without it the reader sees the same
+          char on the Input and Truth rows and thinks the ✗ is wrong. The
+          truth / p(truth) / loss lines follow in the neutral strong ink. */}
       {focusCol && (
-        <SceneText position={[1.3, -0.1, 0]} fontSize={0.24} anchorX="left" color={ink.strong} halo={ink.halo}
-          maxWidth={6} textAlign="left" lineHeight={1.5}>
-          {`truth = "${focusCol.truthChar}"\np(truth) = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
-        </SceneText>
+        <group position={[1.3, 0.55, 0]}>
+          <SceneText position={[0, 0, 0]} fontSize={0.24} anchorX="left" anchorY="top"
+            color={focusCol.correct ? ink.green : ink.amber} halo={ink.halo}>
+            {`top guess = "${focusCol.guessChar}" (${Math.round(focusCol.pGuess * 100)}%)`}
+          </SceneText>
+          <SceneText position={[0, -0.44, 0]} fontSize={0.24} anchorX="left" anchorY="top"
+            color={ink.strong} halo={ink.halo} maxWidth={6} textAlign="left" lineHeight={1.45}>
+            {`truth = "${focusCol.truthChar}"\np(truth) = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
+          </SceneText>
+        </group>
       )}
 
       {showAverage > 0.01 && (

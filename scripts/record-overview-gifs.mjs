@@ -20,8 +20,10 @@ import { join } from 'node:path';
 
 const PORT = 4178;
 const BASE = `http://localhost:${PORT}/microgpt-3d-tutorial`;
-const MODES = ['forward', 'loss', 'sample'];
-const SCHEMES = ['light', 'dark'];
+// MODES/SCHEMES can be narrowed via env (e.g. MODES=loss) to re-record only the
+// clips whose visuals changed, without churning the others.
+const MODES = (process.env.MODES?.split(',') ?? ['forward', 'loss', 'sample']);
+const SCHEMES = (process.env.SCHEMES?.split(',') ?? ['light', 'dark']);
 const FRAMES = 40;       // frames across t=0→1
 const FPS = 14;
 const HOLD = 14;         // extra repeats of the final frame (~1s end-hold)

@@ -125,6 +125,17 @@ describe('buildLossColumns', () => {
     expect(cols[1]).toMatchObject({ inputChar: 'a', truthChar: 'n', correct: false });
   });
 
+  it('exposes the top-1 guess char and its probability for the callout', () => {
+    const cols = buildLossColumns(logits, ids, vocab, 0);
+    // pos 0 argmax is 'a' (logits [0,3,0]); guess == truth so it's correct.
+    expect(cols[0].guessChar).toBe('a');
+    expect(cols[0].pGuess).toBeCloseTo(Math.exp(3) / (2 + Math.exp(3)), 6);
+    // pos 1 is uniform; argmax falls on the sentinel (index 0) → "STOP", which
+    // differs from truth 'n', so the ✗ is explained by guess "STOP" ≠ "n".
+    expect(cols[1].guessChar).toBe('STOP');
+    expect(cols[1].pGuess).toBeCloseTo(1 / 3, 6);
+  });
+
   it('reports p(truth) and loss = -log p(truth)', () => {
     const cols = buildLossColumns(logits, ids, vocab, 0);
     expect(cols[1].pTruth).toBeCloseTo(1 / 3, 6);

@@ -112,6 +112,11 @@ export function buildProbBars(
 export interface LossColumn {
   /** The input character at this position (the sentinel renders as "START"). */
   inputChar: string;
+  /** The model's top-1 prediction (the sentinel renders as "STOP"). Shown so a
+   *  ✗ reads as "guessed X, truth was Y" instead of an apparent self-mismatch. */
+  guessChar: string;
+  /** Probability mass on the top-1 guess. */
+  pGuess: number;
   /** The true next character (the sentinel renders as "STOP" = end-of-sequence). */
   truthChar: string;
   /** Probability the model assigned to the truth. */
@@ -145,6 +150,8 @@ export function buildLossColumns(
     const pTruth = probs[truthId] ?? 0;
     return {
       inputChar: inLabel(ids[t]),
+      guessChar: truthLabel(arg),
+      pGuess: probs[arg] ?? 0,
       truthChar: truthLabel(truthId),
       pTruth,
       loss: -Math.log(Math.max(pTruth, 1e-12)),
