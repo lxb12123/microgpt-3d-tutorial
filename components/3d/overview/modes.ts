@@ -65,20 +65,25 @@ export interface OverviewSchedule {
 }
 
 export interface ProbBar {
-  /** Display label: a vocab char, the literal "BOS", or "other". */
+  /** Display label: a vocab char, the literal "STOP", or "other". */
   char: string;
   /** Probability mass for this bar (the "other" bar aggregates the tail). */
   prob: number;
   /** Vocab index for real bars; -1 for the "other" aggregate. */
   index: number;
+  /** The aggregated tail bar — a sum of un-shown chars, not a single candidate. */
   isOther: boolean;
+  /** The sentinel token. As a NEXT-token prediction it means end-of-sequence. */
+  isStop: boolean;
 }
 
 /**
  * Collapse a full last-position distribution into the top-`topK` characters by
  * probability plus a single "other" bar holding the remaining mass — so the
  * scene shows a readable handful of labeled bars instead of ~27 slivers. The
- * BOS index renders as the literal "BOS".
+ * sentinel (bosId) renders as "STOP": in the output distribution it means the
+ * model wants to END the sequence (training wraps docs with the sentinel on
+ * both ends, and generation stops when it's predicted again).
  */
 export function buildProbBars(
   probs: number[],
@@ -92,22 +97,22 @@ export function buildProbBars(
   const top = ranked.slice(0, topK);
   const rest = ranked.slice(topK);
 
-  const label = (index: number) => (index === bosId ? 'BOS' : vocab[index] ?? '?');
+  const label = (index: number) => (index === bosId ? 'STOP' : vocab[index] ?? '?');
   const bars: ProbBar[] = top.map(({ index, prob }) => ({
-    char: label(index), prob, index, isOther: false,
+    char: label(index), prob, index, isOther: false, isStop: index === bosId,
   }));
 
   const otherMass = rest.reduce((a, r) => a + r.prob, 0);
   if (rest.length > 0 && otherMass > 1e-9) {
-    bars.push({ char: 'other', prob: otherMass, index: -1, isOther: true });
+    bars.push({ char: 'other', prob: otherMass, index: -1, isOther: true, isStop: false });
   }
   return bars;
 }
 
 export interface LossColumn {
-  /** The input character at this position (BOS rendered literally). */
+  /** The input character at this position (the sentinel renders as "START"). */
   inputChar: string;
-  /** The true next character the model should have predicted. */
+  /** The true next character (the sentinel renders as "STOP" = end-of-sequence). */
   truthChar: string;
   /** Probability the model assigned to the truth. */
   pTruth: number;
@@ -128,7 +133,10 @@ export function buildLossColumns(
   vocab: string[],
   bosId: number,
 ): LossColumn[] {
-  const label = (id: number) => (id === bosId ? 'BOS' : vocab[id] ?? '?');
+  // Same sentinel, two roles: at the input start it's START; predicted as the
+  // next token it means STOP (end-of-sequence).
+  const inLabel = (id: number) => (id === bosId ? 'START' : vocab[id] ?? '?');
+  const truthLabel = (id: number) => (id === bosId ? 'STOP' : vocab[id] ?? '?');
   return logits.map((row, t) => {
     const probs = softmaxRow(row);
     const truthId = ids[t + 1];
@@ -136,8 +144,8 @@ export function buildLossColumns(
     for (let i = 1; i < row.length; i++) if (row[i] > row[arg]) arg = i;
     const pTruth = probs[truthId] ?? 0;
     return {
-      inputChar: label(ids[t]),
-      truthChar: label(truthId),
+      inputChar: inLabel(ids[t]),
+      truthChar: truthLabel(truthId),
       pTruth,
       loss: -Math.log(Math.max(pTruth, 1e-12)),
       correct: arg === truthId,

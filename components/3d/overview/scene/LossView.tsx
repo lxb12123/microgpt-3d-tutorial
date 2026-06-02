@@ -65,10 +65,10 @@ export function LossView({
   const focusCol = lossFocusCol >= 0 && lossFocusCol < columns.length ? columns[lossFocusCol] : null;
   return (
     <>
-      <SceneText position={[tokenX(0) - 0.5, 0, 0]} fontSize={0.15} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, 0, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
         Input
       </SceneText>
-      <SceneText position={[tokenX(0) - 0.5, TRUTH_Y, 0]} fontSize={0.15} anchorX="right" color="#94a3b8">
+      <SceneText position={[tokenX(0) - 0.5, TRUTH_Y, 0]} fontSize={0.18} anchorX="right" color="#94a3b8">
         Truth
       </SceneText>
 
@@ -83,21 +83,34 @@ export function LossView({
       {inputChars.map((ch, i) => {
         const act = tokenActivation[i] ?? 0;
         const scale = 0.55 + 0.45 * act;
+        // The last input position has no observed next character (there are
+        // tokenCount-1 columns), so fade it — that's why the two rows differ in
+        // length, and we don't want the reader hunting for its missing truth.
+        const noTruth = i >= columns.length;
         return (
           <group key={`in-${i}`} position={[tokenX(i), 0, 0]} scale={scale}>
-            <TokenCube position={[0, 0, 0]} char={ch} color={palette.body}
-              accentColor={palette.accent} accentStrength={0.2 + 0.7 * act}
+            <TokenCube position={[0, 0, 0]} char={ch}
+              color={noTruth ? '#3a4250' : palette.body}
+              accentColor={palette.accent}
+              accentStrength={noTruth ? 0.08 : 0.2 + 0.7 * act}
               labelSize={ch.length > 1 ? 0.16 : 0.3} />
           </group>
         );
       })}
+
+      {inputChars.length > columns.length && (
+        <SceneText position={[tokenX(columns.length), MARK_Y, 0]} fontSize={0.14}
+          color="#64748b" anchorX="center" maxWidth={1.4} textAlign="center" lineHeight={1.2}>
+          no observed next char
+        </SceneText>
+      )}
 
       {columns.map((col, i) => {
         const revealed = i < lossRevealed;
         const x = tokenX(i);
         return (
           <group key={`col-${i}`}>
-            <SceneText position={[x, TRUTH_Y, 0]} fontSize={0.26}
+            <SceneText position={[x, TRUTH_Y, 0]} fontSize={0.3}
               color={revealed ? (col.correct ? GREEN : RED) : '#475569'}>
               {col.truthChar}
             </SceneText>
@@ -110,17 +123,18 @@ export function LossView({
         );
       })}
 
-      {/* Focused-column callout, placed in the empty space to the right. */}
+      {/* Focused-column callout, placed in the empty space to the right —
+          three short lines so it stays readable in a 480px GIF. */}
       {focusCol && (
-        <SceneText position={[1.2, -0.2, 0]} fontSize={0.2} anchorX="left" color="#e2e8f0"
-          maxWidth={6} textAlign="left" lineHeight={1.45}>
-          {`true next char: "${focusCol.truthChar}"\nmodel gave it p = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
+        <SceneText position={[1.3, -0.1, 0]} fontSize={0.24} anchorX="left" color="#e2e8f0"
+          maxWidth={6} textAlign="left" lineHeight={1.5}>
+          {`truth = "${focusCol.truthChar}"\np(truth) = ${Math.round(focusCol.pTruth * 100)}%\nloss = -log(${focusCol.pTruth.toFixed(2)}) = ${focusCol.loss.toFixed(2)}`}
         </SceneText>
       )}
 
       {showAverage > 0.01 && (
-        <group position={[0, TRUTH_Y - 0.9, 0]}>
-          <SceneText fontSize={0.2} color="#facc15"
+        <group position={[0, TRUTH_Y - 0.95, 0]}>
+          <SceneText fontSize={0.24} color="#facc15"
             fillOpacity={showAverage} outlineOpacity={showAverage}>
             {`Average loss = mean(-log p(true next char)) = ${averageLoss.toFixed(2)}`}
           </SceneText>

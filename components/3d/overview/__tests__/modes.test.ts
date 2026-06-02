@@ -98,13 +98,15 @@ describe('buildProbBars', () => {
 
   it('omits the "other" bar when topK already covers the vocab', () => {
     const bars = buildProbBars([0.5, 0.5], ['.', 'a'], 0, 5);
-    expect(bars.map((b) => b.char)).toEqual(['BOS', 'a']);
+    expect(bars.map((b) => b.char)).toEqual(['STOP', 'a']);
     expect(bars.some((b) => b.isOther)).toBe(false);
   });
 
-  it('renders the BOS index as the literal "BOS"', () => {
+  it('renders the sentinel (bosId) as "STOP" and flags it isStop', () => {
     const bars = buildProbBars([0.9, 0.1], ['.', 'a'], 0, 1);
-    expect(bars[0].char).toBe('BOS');
+    expect(bars[0].char).toBe('STOP');
+    expect(bars[0].isStop).toBe(true);
+    expect(bars[0].isOther).toBe(false);
   });
 });
 
@@ -119,7 +121,7 @@ describe('buildLossColumns', () => {
   it('aligns input char to the true next char and flags correctness', () => {
     const cols = buildLossColumns(logits, ids, vocab, 0);
     expect(cols).toHaveLength(2);
-    expect(cols[0]).toMatchObject({ inputChar: 'BOS', truthChar: 'a', correct: true });
+    expect(cols[0]).toMatchObject({ inputChar: 'START', truthChar: 'a', correct: true });
     expect(cols[1]).toMatchObject({ inputChar: 'a', truthChar: 'n', correct: false });
   });
 
