@@ -1,16 +1,20 @@
 """
-Autograd lab: chip.glb — a low, rounded "computation chip" node.
+Autograd lab: chip.glb — a low, flat, rounded "computation chip" CARD.
+
+Designed to face the camera in the vertical-board DAG: a wide rounded rectangle
+(x=1.35, y=0.85) that is THIN toward the viewer (z=0.28), so at a 3/4 angle it
+reads as a slim chip module — not a chunky box. Rounded corners, a recessed front
+panel, a thin glowing rim frame around the face, and a faint under-glow behind.
 
 THREE retintable material regions (the React <AutogradNode> clones the glb per
 instance and recolours these by theme / node type / activation — detection is by
 material NAME, so DO NOT rename):
 
   - ChipBodyMat   body (ceramic/satin, base-colour retinted per node)
-  - ChipRimMat    glowing top rim frame (emissive, brightens on activation)
-  - ChipGlowMat   soft under-plate halo (low emissive, theme tint)
+  - ChipRimMat    glowing face rim frame (emissive)
+  - ChipGlowMat   recessed front panel + soft under-glow (low emissive)
 
-Footprint ~1×1, height ~0.45 so it reads as a module. LabelTop/LabelBottom empty
-anchors are kept for the React label layer. PBR nodes only, no textures.
+LabelTop / LabelBottom empties are kept for the React label layer. PBR only.
 """
 import os
 import bpy
@@ -18,7 +22,7 @@ import bpy
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
 OUTPUT_PATH = os.path.join(REPO_ROOT, 'public', 'models', 'autograd', 'chip.glb')
 
-BODY_H = 0.45
+W, H, D = 1.35, 0.85, 0.28   # width(x), face-height(y), thickness toward camera(z)
 
 
 def _mat(name, base, *, rough=0.5, metal=0.1, emit=None, emit_strength=0.0):
@@ -49,46 +53,52 @@ def _box(name, location, scale, material, parent=None):
 def main() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
-    body_mat = _mat('ChipBodyMat', (0.82, 0.84, 0.88), rough=0.42, metal=0.12)
-    rim_mat = _mat('ChipRimMat', (0.0, 0.9, 1.0), rough=0.35, metal=0.0,
+    body_mat = _mat('ChipBodyMat', (0.86, 0.88, 0.92), rough=0.4, metal=0.1)
+    rim_mat = _mat('ChipRimMat', (0.0, 0.9, 1.0), rough=0.3, metal=0.0,
                    emit=(0.0, 0.9, 1.0), emit_strength=3.0)
-    glow_mat = _mat('ChipGlowMat', (0.0, 0.9, 1.0), rough=0.6, metal=0.0,
-                    emit=(0.0, 0.9, 1.0), emit_strength=0.6)
+    glow_mat = _mat('ChipGlowMat', (0.0, 0.9, 1.0), rough=0.55, metal=0.0,
+                    emit=(0.0, 0.9, 1.0), emit_strength=0.5)
 
-    # Body: low rounded chip.
+    # --- Body: flat rounded card (thin in z, facing the camera) ---
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.0, 0.0))
-    cube = bpy.context.active_object
-    cube.name = 'Chip'
-    cube.scale = (1.0, 1.0, BODY_H)
+    body = bpy.context.active_object
+    body.name = 'Chip'
+    body.scale = (W, H, D)
     bpy.ops.object.transform_apply(scale=True)
-    bevel = cube.modifiers.new(name='Bevel', type='BEVEL')
-    bevel.width = 0.06
-    bevel.segments = 3
+    bevel = body.modifiers.new(name='Bevel', type='BEVEL')
+    bevel.width = 0.11           # pronounced-but-restrained rounded corners
+    bevel.segments = 4
     bevel.limit_method = 'ANGLE'
     bpy.ops.object.modifier_apply(modifier='Bevel')
-    cube.data.materials.append(body_mat)
+    body.data.materials.append(body_mat)
 
-    # Glowing top rim frame (4 thin emissive bars inset from the edges).
-    top_z = BODY_H / 2.0 + 0.012
-    inset, bar_t, bar_h = 0.36, 0.045, 0.03
-    span = inset * 2.0 + bar_t
+    face_z = D / 2.0             # the +z face plane
+
+    # --- Recessed front panel (the "screen") just inside the rim ---
+    _box('ChipPanel', (0.0, -0.02, face_z - 0.02), (W - 0.34, H - 0.30, 0.03), glow_mat, parent=body)
+
+    # --- Thin glowing rim frame around the face perimeter ---
+    inset_x = W / 2.0 - 0.12
+    inset_y = H / 2.0 - 0.12
+    bar = 0.04
+    rim_z = face_z + 0.012
     for name, loc, scale in (
-        ('Rim_PX', (inset, 0.0, top_z), (bar_t, span, bar_h)),
-        ('Rim_NX', (-inset, 0.0, top_z), (bar_t, span, bar_h)),
-        ('Rim_PY', (0.0, inset, top_z), (span, bar_t, bar_h)),
-        ('Rim_NY', (0.0, -inset, top_z), (span, bar_t, bar_h)),
+        ('Rim_T', (0.0, inset_y, rim_z), (inset_x * 2.0 + bar, bar, 0.022)),
+        ('Rim_B', (0.0, -inset_y, rim_z), (inset_x * 2.0 + bar, bar, 0.022)),
+        ('Rim_L', (-inset_x, 0.0, rim_z), (bar, inset_y * 2.0 + bar, 0.022)),
+        ('Rim_R', (inset_x, 0.0, rim_z), (bar, inset_y * 2.0 + bar, 0.022)),
     ):
-        _box(name, loc, scale, rim_mat, parent=cube)
+        _box(name, loc, scale, rim_mat, parent=body)
 
-    # Soft under-plate halo.
-    _box('ChipUnderGlow', (0.0, 0.0, -BODY_H / 2.0 - 0.02), (1.08, 1.08, 0.02), glow_mat, parent=cube)
+    # --- Soft under-glow plate behind the card (faint, not a hard shadow) ---
+    _box('ChipUnderGlow', (0.0, 0.0, -D / 2.0 - 0.04), (W + 0.18, H + 0.18, 0.02), glow_mat, parent=body)
 
-    # Label anchors for the React label layer.
-    for anchor_name, z in (('LabelTop', BODY_H / 2.0 + 0.18), ('LabelBottom', -BODY_H / 2.0 - 0.18)):
-        bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0.0, 0.0, z))
+    # --- Label anchors ---
+    for anchor_name, y in (('LabelTop', H / 2.0 + 0.4), ('LabelBottom', -H / 2.0 - 0.3)):
+        bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0.0, y, 0.0))
         anchor = bpy.context.active_object
         anchor.name = anchor_name
-        anchor.parent = cube
+        anchor.parent = body
 
     bpy.ops.object.select_all(action='SELECT')
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)

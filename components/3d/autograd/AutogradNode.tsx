@@ -6,13 +6,14 @@ import { useFrame } from '@react-three/fiber';
 import {
   AdditiveBlending, CanvasTexture, Color, type Group, type Mesh, type Object3D,
 } from 'three';
-import type { AutogradTheme, NodeKind } from './theme';
+import { activeRimColor, type AutogradTheme, type NodeKind } from './theme';
 
 const CHIP_URL = '/microgpt-3d-tutorial/models/autograd/chip.glb';
 
-// Per-kind base scale — the output chip is the biggest (it's "the answer"),
-// variables the smallest. Applied on top of the layout group scale.
-const KIND_SCALE: Record<NodeKind, number> = { variable: 0.82, op: 0.92, output: 1.12 };
+// Per-kind base scale — output slightly bigger ("the answer"), variables
+// smallest. The chip card is wide (1.35×0.85), so these are smaller than for a
+// unit cube. Applied on top of the layout group scale.
+const KIND_SCALE: Record<NodeKind, number> = { variable: 0.7, op: 0.76, output: 0.9 };
 
 // A soft radial sprite for the additive halo behind a glowing chip — generated
 // once (client-side) and tinted per node via the material colour.
@@ -73,11 +74,14 @@ export function AutogradNode({ position, kind, theme, flowColor, activation, lit
   }, [gltf.scene]);
 
   const bodyColor = theme.body[kind];
-  // Rim: established nodes keep a soft flow-coloured glow; the active node flares.
+  // Rim: each kind has an idle identity colour; established/active nodes flare to
+  // the flow colour (forward/backward) — except output, which keeps amber.
+  const idleRim = theme.rimIdle[kind];
+  const activeRim = activeRimColor(theme, kind, flowColor);
   const flowLit = lit || activation > 0.03;
-  const rimColor = flowLit ? flowColor : theme.rimIdle;
-  const rimIntensity = (lit ? 1.0 : 0.4) + 2.2 * activation;
-  const glowColor = flowLit ? flowColor : theme.rimIdle;
+  const rimColor = flowLit ? activeRim : idleRim;
+  const rimIntensity = (lit ? 1.0 : 0.45) + 2.2 * activation;
+  const glowColor = flowLit ? activeRim : idleRim;
 
   useLayoutEffect(() => {
     scene.traverse((obj: Object3D) => {
@@ -117,14 +121,14 @@ export function AutogradNode({ position, kind, theme, flowColor, activation, lit
 
   const s = KIND_SCALE[kind];
   const tex = haloTexture();
-  const haloColor = useMemo(() => new Color(flowColor), [flowColor]);
+  const haloColor = useMemo(() => new Color(activeRim), [activeRim]);
 
   return (
     <group ref={groupRef} position={position}>
       {/* Additive halo behind the chip — only visible as it activates. */}
       {tex && activation > 0.04 && (
         <Billboard position={[0, 0, -0.25]}>
-          <mesh scale={[2.2 * s, 2.2 * s, 1]}>
+          <mesh scale={[2.9 * s, 2.0 * s, 1]}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial
               map={tex}

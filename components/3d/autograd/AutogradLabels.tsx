@@ -41,7 +41,7 @@ export function NodeCard({
   position, kind, name, value, valueRevealed, detail, grad, gradRevealed, derived, constant, expansion, theme,
 }: NodeCardProps) {
   const title = kind === 'output' ? 'output' : name || KIND_LABEL[kind];
-  const accent = kind === 'output' ? theme.gradPos : theme.forward;
+  const accent = kind === 'output' ? theme.outputRim : theme.forward;
   return (
     <Html position={position} center distanceFactor={8} style={cardStyle(theme)} zIndexRange={[20, 0]}>
       <div style={{ fontWeight: 700, fontSize: 12.5, color: accent, textAlign: 'center', marginBottom: 1 }}>{title}</div>

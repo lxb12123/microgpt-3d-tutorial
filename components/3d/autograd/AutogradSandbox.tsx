@@ -233,7 +233,7 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
           return (
             <NodeCard
               key={`card-${n.id}`}
-              position={[pos[n.id][0], pos[n.id][1] + 0.95, pos[n.id][2]]}
+              position={[pos[n.id][0], pos[n.id][1] + 1.05, pos[n.id][2]]}
               kind={kindOf(n.id)}
               name={n.label}
               value={n.value.data}
