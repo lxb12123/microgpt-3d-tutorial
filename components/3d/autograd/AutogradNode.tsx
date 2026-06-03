@@ -4,7 +4,7 @@ import { useGLTF, Billboard } from '@react-three/drei';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  AdditiveBlending, CanvasTexture, Color, type Group, type Mesh, type Object3D,
+  AdditiveBlending, CanvasTexture, Color, NormalBlending, type Group, type Mesh, type Object3D,
 } from 'three';
 import { activeRimColor, type AutogradTheme, type NodeKind } from './theme';
 
@@ -80,8 +80,12 @@ export function AutogradNode({ position, kind, theme, flowColor, activation, lit
   const activeRim = activeRimColor(theme, kind, flowColor);
   const flowLit = lit || activation > 0.03;
   const rimColor = flowLit ? activeRim : idleRim;
-  const rimIntensity = (lit ? 1.0 : 0.45) + 2.2 * activation;
+  // Glow multiplier keeps dark luminous and light crisp (a thin coloured line,
+  // not fog). The rim still reads in light because its BASE colour shows under
+  // the bright rig even at low emissive.
+  const rimIntensity = ((lit ? 1.0 : 0.45) + 2.2 * activation) * theme.glow;
   const glowColor = flowLit ? activeRim : idleRim;
+  const glowIntensity = (0.2 + 0.8 * activation) * theme.glow;
 
   useLayoutEffect(() => {
     scene.traverse((obj: Object3D) => {
@@ -99,10 +103,10 @@ export function AutogradNode({ position, kind, theme, flowColor, activation, lit
       } else if (name.includes('Glow')) {
         mat.color?.set(glowColor);
         mat.emissive?.set(glowColor);
-        if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 0.25 + 0.9 * activation;
+        if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = glowIntensity;
       }
     });
-  }, [scene, bodyColor, rimColor, rimIntensity, glowColor, activation]);
+  }, [scene, bodyColor, rimColor, rimIntensity, glowColor, glowIntensity, activation]);
 
   // Gentle rim breathing while active — keeps the chip feeling "live".
   const groupRef = useRef<Group>(null);
@@ -121,21 +125,30 @@ export function AutogradNode({ position, kind, theme, flowColor, activation, lit
 
   const s = KIND_SCALE[kind];
   const tex = haloTexture();
-  const haloColor = useMemo(() => new Color(activeRim), [activeRim]);
+  const isGlow = theme.haloMode === 'glow';
+  const haloColor = useMemo(
+    () => new Color(isGlow ? activeRim : theme.shadowColor),
+    [isGlow, activeRim, theme.shadowColor],
+  );
+  // Dark: bright additive glow that flares on activation. Light: a soft, steady
+  // grounding shadow behind the chip (so it doesn't float on the blank canvas).
+  const haloVisible = isGlow ? activation > 0.04 : true;
+  const haloOpacity = isGlow ? 0.26 + 0.5 * activation : 0.16 + 0.12 * activation;
+  const haloPos: [number, number, number] = isGlow ? [0, 0, -0.25] : [0, -0.12, -0.22];
+  const haloScale: [number, number, number] = isGlow ? [2.9 * s, 2.0 * s, 1] : [2.2 * s, 1.5 * s, 1];
 
   return (
     <group ref={groupRef} position={position}>
-      {/* Additive halo behind the chip — only visible as it activates. */}
-      {tex && activation > 0.04 && (
-        <Billboard position={[0, 0, -0.25]}>
-          <mesh scale={[2.9 * s, 2.0 * s, 1]}>
+      {tex && haloVisible && (
+        <Billboard position={haloPos}>
+          <mesh scale={haloScale}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial
               map={tex}
               color={haloColor}
               transparent
-              opacity={0.28 + 0.5 * activation}
-              blending={AdditiveBlending}
+              opacity={haloOpacity}
+              blending={isGlow ? AdditiveBlending : NormalBlending}
               depthWrite={false}
             />
           </mesh>

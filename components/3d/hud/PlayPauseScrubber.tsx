@@ -11,10 +11,13 @@ export interface PlayPauseScrubberProps {
   onSeek: (positionSeconds: number) => void;
   /** Called when play/pause is toggled. Caller manages actual playback. */
   onTogglePlay: (playing: boolean) => void;
+  /** 'light' restyles for a light HUD (default 'dark' keeps the original look). */
+  variant?: 'dark' | 'light';
 }
 
-export function PlayPauseScrubber({ duration, position, onSeek, onTogglePlay }: PlayPauseScrubberProps) {
+export function PlayPauseScrubber({ duration, position, onSeek, onTogglePlay, variant = 'dark' }: PlayPauseScrubberProps) {
   const [playing, setPlaying] = useState(false);
+  const light = variant === 'light';
 
   const handleToggle = () => {
     const next = !playing;
@@ -23,7 +26,7 @@ export function PlayPauseScrubber({ duration, position, onSeek, onTogglePlay }: 
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: 'rgba(0,0,0,0.5)', borderRadius: 6, color: '#fff' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: light ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.5)', border: light ? '1px solid rgba(100,116,139,0.28)' : 'none', borderRadius: 6, color: light ? '#0f172a' : '#fff' }}>
       <button type="button" onClick={handleToggle} aria-label={playing ? 'Pause' : 'Play'}>
         {playing ? '⏸' : '▶'}
       </button>

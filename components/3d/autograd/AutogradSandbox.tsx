@@ -14,6 +14,7 @@ import { getAutogradTheme, type NodeKind } from './theme';
 import { AutogradNode } from './AutogradNode';
 import { AutogradEdge } from './AutogradEdge';
 import { NodeCard, ChainRuleLabel } from './AutogradLabels';
+import { BenchGrid } from './BenchGrid';
 
 const noopSubscribe = () => () => {};
 function useResolvedScheme(): 'light' | 'dark' {
@@ -47,9 +48,11 @@ const TITLE: Record<Phase, { title: string; subtitle: string }> = {
 const DURATION = 3.0;
 
 // Bright neutral rig on the light theme; dark theme keeps the SceneViewer default.
+// Light rig gives the white chips actual FORM (a top-lit gradient) instead of a
+// flat white blob — lower ambient + a stronger key so they read against the bg.
 const LIGHT_RIG: SceneLighting = {
-  ambient: 0.9, hemi: 0.5, hemiColors: ['#ffffff', '#eef1f6'],
-  key: 0.5, keyColor: '#ffffff', rim: 0.18, rimColor: '#ffffff',
+  ambient: 0.58, hemi: 0.45, hemiColors: ['#ffffff', '#dfe6f0'],
+  key: 0.9, keyColor: '#ffffff', rim: 0.2, rimColor: '#cfe0f2',
 };
 
 function collectVarNames(src: string): string[] {
@@ -147,6 +150,8 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
   };
 
   const head = TITLE[phase];
+  const h = theme.hud;
+  const hv: 'light' | 'dark' = scheme === 'light' ? 'light' : 'dark';
   const hud = (
    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, fontFamily: 'ui-monospace, monospace' }}>
@@ -155,27 +160,28 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
     </div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
       <input value={expr} onChange={(e) => setExpr(e.target.value)} maxLength={200} aria-label="expression"
-        style={{ fontFamily: 'monospace', padding: 4, minWidth: 200, background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid #444' }} />
+        style={{ fontFamily: 'monospace', padding: 4, minWidth: 200, background: h.inputBg, color: h.text, border: `1px solid ${h.border}`, borderRadius: 5 }} />
       {PRESETS.map((p) => (
-        <button key={p.label} type="button" onClick={() => loadPreset(p)}>{p.label}</button>
+        <button key={p.label} type="button" onClick={() => loadPreset(p)}
+          style={{ background: h.bg, color: h.text, border: `1px solid ${h.border}`, borderRadius: 5, padding: '4px 8px', cursor: 'pointer', fontSize: 12 }}>{p.label}</button>
       ))}
       {varNames.map((name) => (
-        <label key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 6, color: '#fff' }}>
+        <label key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: 6, background: h.bg, border: `1px solid ${h.border}`, borderRadius: 6, color: h.text }}>
           <span style={{ fontSize: 12 }}>{name}</span>
-          <input type="range" min={-10} max={10} step={0.1} value={effVars[name] ?? 0} aria-label={name}
+          <input type="range" min={-10} max={10} step={0.1} value={effVars[name] ?? 0} aria-label={name} style={{ accentColor: h.accent }}
             onChange={(e) => { setVars({ ...effVars, [name]: Number(e.target.value) }); restart(); }} />
           <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{(effVars[name] ?? 0).toFixed(1)}</span>
         </label>
       ))}
-      <ModeSelector items={MODE_ITEMS} value={phase} onChange={switchPhase} />
-      <PlayPauseScrubber duration={DURATION} position={t * DURATION} onSeek={seek} onTogglePlay={togglePlay} />
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 12, background: 'rgba(0,0,0,0.5)', padding: '4px 6px', borderRadius: 6 }}>
-        <input type="checkbox" checked={showLocal} onChange={(e) => setShowLocal(e.target.checked)} /> local derivatives
+      <ModeSelector items={MODE_ITEMS} value={phase} onChange={switchPhase} variant={hv} />
+      <PlayPauseScrubber duration={DURATION} position={t * DURATION} onSeek={seek} onTogglePlay={togglePlay} variant={hv} />
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: h.text, fontSize: 12, background: h.bg, border: `1px solid ${h.border}`, padding: '4px 6px', borderRadius: 6 }}>
+        <input type="checkbox" checked={showLocal} onChange={(e) => setShowLocal(e.target.checked)} style={{ accentColor: h.accent }} /> local derivatives
       </label>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 12, background: 'rgba(0,0,0,0.5)', padding: '4px 6px', borderRadius: 6 }}>
-        <input type="checkbox" checked={showFinal} onChange={(e) => setShowFinal(e.target.checked)} /> final gradients
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: h.text, fontSize: 12, background: h.bg, border: `1px solid ${h.border}`, padding: '4px 6px', borderRadius: 6 }}>
+        <input type="checkbox" checked={showFinal} onChange={(e) => setShowFinal(e.target.checked)} style={{ accentColor: h.accent }} /> final gradients
       </label>
-      <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12, background: 'rgba(0,0,0,0.55)', padding: '6px 8px', borderRadius: 6 }}>
+      <span style={{ color: h.text, fontFamily: 'monospace', fontSize: 12, background: h.bg, border: `1px solid ${h.border}`, padding: '6px 8px', borderRadius: 6 }}>
         output = {dag.root.data.toFixed(3)}
       </span>
     </div>
@@ -196,6 +202,7 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
       controls={{ enablePan: false, minPolarAngle: 1.15, maxPolarAngle: 1.62, minAzimuthAngle: -0.5, maxAzimuthAngle: 0.5, minDistance: 7, maxDistance: 20 }}
     >
       <TimelineClock playing={playing} tRef={tRef} onTick={setT} onEnd={() => setPlaying(false)} />
+      <BenchGrid color={theme.surfaceGrid} opacity={theme.surfaceOpacity} />
 
       <group scale={layout!.groupScale} position={[0, layout!.groupY, 0]}>
         {/* Edges (under the chips) */}

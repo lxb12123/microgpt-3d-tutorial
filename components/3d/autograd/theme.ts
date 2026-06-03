@@ -29,6 +29,19 @@ export interface AutogradTheme {
   cardText: string;
   cardMuted: string;
   subtitle: string;
+  /** Emissive / halo multiplier. Dark = full glow; light = restrained (clean
+   *  lines, not fluorescent fog). */
+  glow: number;
+  /** Behind each chip: a bright additive halo (dark) or a soft grounding shadow
+   *  (light). */
+  haloMode: 'glow' | 'shadow';
+  /** Ink for the light-mode grounding shadow. */
+  shadowColor: string;
+  /** Faint backdrop grid that holds the nodes on a "bench". */
+  surfaceGrid: string;
+  surfaceOpacity: number;
+  /** Theme-aware HUD chrome (so the light HUD isn't heavy dark-grey pills). */
+  hud: { bg: string; text: string; border: string; inputBg: string; accent: string };
 }
 
 const DARK: AutogradTheme = {
@@ -43,11 +56,17 @@ const DARK: AutogradTheme = {
   gradNeg: '#fb7185',
   edgeInactive: '#39424f',
   edgePropagated: '#5b6b86',
-  cardBg: 'rgba(10,14,24,0.82)',
-  cardBorder: 'rgba(120,140,180,0.30)',
-  cardText: '#e8eefc',
-  cardMuted: '#94a3b8',
+  cardBg: 'rgba(12,17,30,0.86)',
+  cardBorder: 'rgba(120,140,180,0.32)',
+  cardText: '#eaf0fb',
+  cardMuted: '#9aa7bd',
   subtitle: '#aab6cc',
+  glow: 1.0,
+  haloMode: 'glow',
+  shadowColor: '#000000',
+  surfaceGrid: '#1b2536',
+  surfaceOpacity: 0.5,
+  hud: { bg: 'rgba(255,255,255,0.06)', text: '#e8eefc', border: 'rgba(140,160,200,0.25)', inputBg: 'rgba(8,12,22,0.7)', accent: '#3b82f6' },
 };
 
 const LIGHT: AutogradTheme = {
@@ -62,11 +81,17 @@ const LIGHT: AutogradTheme = {
   gradNeg: '#e11d48',
   edgeInactive: '#c8d3e2',
   edgePropagated: '#9fb0c8',
-  cardBg: 'rgba(255,255,255,0.94)',
-  cardBorder: 'rgba(80,110,150,0.28)',
+  cardBg: 'rgba(255,255,255,0.95)',
+  cardBorder: 'rgba(100,116,139,0.25)',
   cardText: '#0f172a',
   cardMuted: '#64748b',
   subtitle: '#475569',
+  glow: 0.32,
+  haloMode: 'shadow',
+  shadowColor: '#334155',
+  surfaceGrid: '#d2deee',
+  surfaceOpacity: 0.7,
+  hud: { bg: 'rgba(255,255,255,0.82)', text: '#0f172a', border: 'rgba(100,116,139,0.28)', inputBg: '#ffffff', accent: '#2563eb' },
 };
 
 export function getAutogradTheme(scheme: Scheme): AutogradTheme {

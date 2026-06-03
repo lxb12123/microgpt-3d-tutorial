@@ -71,9 +71,9 @@ export function AutogradEdge({ from, to, theme, flowColor, state, pulse, directi
   const shaftColor = state === 'active' ? flowColor
     : state === 'propagated' ? theme.edgePropagated
     : theme.edgeInactive;
-  const shaftEmissive = state === 'active' ? 1.6 : state === 'propagated' ? 0.4 : 0.0;
+  const shaftEmissive = (state === 'active' ? 1.6 : state === 'propagated' ? 0.4 : 0.0) * theme.glow;
   const tipColor = state === 'active' ? flowColor : state === 'propagated' ? theme.edgePropagated : theme.edgeInactive;
-  const tipEmissive = state === 'active' ? 3.0 : state === 'propagated' ? 0.8 : 0.15;
+  const tipEmissive = (state === 'active' ? 3.0 : state === 'propagated' ? 0.8 : 0.15) * theme.glow;
 
   useLayoutEffect(() => {
     wire.traverse((obj: Object3D) => {
@@ -98,8 +98,9 @@ export function AutogradEdge({ from, to, theme, flowColor, state, pulse, directi
       if (!('isMesh' in mesh) || !mesh.isMesh || !mesh.material) return;
       const mat = mesh.material as unknown as MatLike;
       mat.color?.set(c); mat.emissive?.set(c);
+      if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 1.2 + 3.0 * theme.glow;
     });
-  }, [pulseObj, flowColor]);
+  }, [pulseObj, flowColor, theme.glow]);
 
   const showPulse = state === 'active' && pulse > 0.02 && pulse < 0.99;
   const pulsePos = showPulse ? startV.clone().lerp(endV, pulse) : null;
