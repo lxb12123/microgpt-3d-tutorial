@@ -15,18 +15,14 @@ for (const colorScheme of ['dark', 'light'] as const) {
     // the page into view to trigger it before asserting canvas.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
-    // ParamSlider renders the head control as an <input type="range"
-    // aria-label="head">. Playwright's `getByLabel` matches the accessibility
-    // name; the spec used `getByLabelText` (a Testing Library API) which
-    // doesn't exist on Page — corrected to `getByLabel`.
-    await expect(page.getByLabel(/head/i)).toBeVisible({ timeout: 10_000 });
+    // The head control is an <input type="range" aria-label="head">. Use the
+    // exact label so it doesn't also match the "multi-head" toggle.
+    await expect(page.getByLabel('head', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(2_000);
 
-    // Click a score cell and verify the dot-product breakdown text appears.
-    // The (0,0) cell is always available because every test input produces at
-    // least one token (BOS + first char), and j ≤ i means [0,0] is valid.
-    await page.getByText('score cells', { exact: false }).click();
-    await page.getByTestId('score-cell-0-0').click();
+    // Click an "inspect q·k" key button and verify the dot-product breakdown
+    // appears. j=0 is always visible (0 <= the query index for any input).
+    await page.getByTestId('inspect-key-0').click();
     await expect(page.getByTestId('dot-product-breakdown')).toBeVisible({ timeout: 5_000 });
 
     await page.screenshot({ path: `/tmp/phase2-03-attention-${colorScheme}.png`, fullPage: true });

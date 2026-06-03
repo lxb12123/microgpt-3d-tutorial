@@ -31,9 +31,11 @@ export interface GptOptions {
 }
 
 export interface GptCaptures {
-  /** Per-layer per-head per-query causal-softmax attention weights: [layer][head][i][j], j<=i. */
-  attention_scores?: number[][][][];
-  /** Alias of attention_scores; provided so spec §6 wording matches. */
+  /** RAW SCALED attention logits — q_i·k_j / sqrt(d_head), causal (j<=i), BEFORE
+   *  softmax: [layer][head][i][j]. A DISTINCT concept from attention_softmax. */
+  attention_logits?: number[][][][];
+  /** Causal SOFTMAX attention weights (each row over j<=i sums to 1):
+   *  [layer][head][i][j]. */
   attention_softmax?: number[][][][];
   /** [layer][head][t][head_dim] — Q vector per head per query position. */
   q_per_head?: number[][][][];
@@ -157,7 +159,8 @@ export function gpt(
   }
 
   // Accumulators for per-layer captures.
-  const attnScoresAll: number[][][][] = [];
+  const attnScoresAll: number[][][][] = [];   // softmax weights
+  const attnLogitsAll: number[][][][] = [];   // raw scaled logits (pre-softmax)
   const mlpPreReluAll: number[][][] = [];
   const qPerHeadAll: number[][][][] = [];
   const kPerHeadAll: number[][][][] = [];
@@ -199,11 +202,13 @@ export function gpt(
     // For each query position i, attend over keys/values at positions <= i
     // (causal mask), separately per head, then concat heads back to N_EMBD.
     const attnOutPreProj: Value[][] = new Array(T);
-    const layerScores: number[][][] = new Array(N_HEAD);
+    const layerScores: number[][][] = new Array(N_HEAD);   // softmax weights
+    const layerLogits: number[][][] = new Array(N_HEAD);   // raw scaled logits
     // Per-head pre-projection output: [head][t][head_dim].
     const headOut: number[][][] = new Array(N_HEAD);
     for (let h = 0; h < N_HEAD; h++) {
       layerScores[h] = new Array(T);
+      layerLogits[h] = new Array(T);
       headOut[h] = new Array(T);
       for (let t = 0; t < T; t++) headOut[h][t] = new Array(HEAD_DIM);
     }
@@ -226,6 +231,7 @@ export function gpt(
         }
         const attnWeights = softmax(attnLogits);
 
+        layerLogits[h][i] = attnLogits.map((l) => l.data);
         layerScores[h][i] = attnWeights.map((w) => w.data);
 
         // Weighted sum of value vectors for this head.
@@ -241,6 +247,7 @@ export function gpt(
       attnOutPreProj[i] = xAttnRow;
     }
     attnScoresAll.push(layerScores);
+    attnLogitsAll.push(layerLogits);
     qPerHeadAll.push(qHeadAll);
     kPerHeadAll.push(kHeadAll);
     vPerHeadAll.push(vHeadAll);
@@ -280,8 +287,8 @@ export function gpt(
     );
   }
 
-  if (captureSet.has('attention_scores')) {
-    captures.attention_scores = attnScoresAll;
+  if (captureSet.has('attention_logits')) {
+    captures.attention_logits = attnLogitsAll;
   }
   if (captureSet.has('attention_softmax')) {
     captures.attention_softmax = attnScoresAll;

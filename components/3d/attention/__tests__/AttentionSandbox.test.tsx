@@ -17,6 +17,7 @@ vi.mock('@react-three/drei', () => {
   return {
     useGLTF,
     Html: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Billboard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     OrbitControls: () => null,
     Instances: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Instance: () => null,
@@ -44,7 +45,16 @@ describe('AttentionSandbox', () => {
   it('shows a head slider and a text input, capped at 6 tokens', async () => {
     render(<AttentionSandbox defaultText="abc" />);
     await waitFor(() => expect(screen.getByDisplayValue('abc')).toBeInTheDocument());
-    expect(screen.getByLabelText(/head/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('head')).toBeInTheDocument();   // the head <input> aria-label
+    expect(screen.getByLabelText('query')).toBeInTheDocument();
+  });
+
+  it('exposes the phase toggles (Q/K/V, scores, weights, mask, multi-head)', async () => {
+    render(<AttentionSandbox defaultText="abc" />);
+    await waitFor(() => screen.getByDisplayValue('abc'));
+    expect(screen.getByText(/masked future/i)).toBeInTheDocument();
+    expect(screen.getByText(/softmax weights/i)).toBeInTheDocument();
+    expect(screen.getByText(/multi-head/i)).toBeInTheDocument();
   });
 
   it('truncates input beyond 6 tokens', async () => {

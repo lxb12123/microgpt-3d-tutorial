@@ -1,27 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { computeLayerOpacities, ATTENTION_PHASES } from '../scheduler';
+import { computeAttentionState, ATTENTION_PHASES } from '../scheduler';
 
-describe('attention scheduler', () => {
-  it('returns 6 entries, one per phase', () => {
-    const out = computeLayerOpacities(0.5);
-    expect(Object.keys(out).sort()).toEqual([...ATTENTION_PHASES].sort());
+describe('computeAttentionState', () => {
+  it('at t=0 nothing is revealed', () => {
+    const s = computeAttentionState(0);
+    for (const p of ATTENTION_PHASES) expect(s.progress[p]).toBe(0);
+    expect(s.phase).toBe('tokens');
   });
 
-  it('at t=0 only the first phase is starting', () => {
-    const out = computeLayerOpacities(0);
-    expect(out.q).toBe(0);
-    expect(out.output).toBe(0);
+  it('at t=1 every phase is fully revealed', () => {
+    const s = computeAttentionState(1);
+    for (const p of ATTENTION_PHASES) expect(s.progress[p]).toBe(1);
+    expect(s.phase).toBe('multihead');
   });
 
-  it('at t=1 every phase is at full opacity', () => {
-    const out = computeLayerOpacities(1);
-    for (const k of ATTENTION_PHASES) expect(out[k]).toBe(1);
+  it('reveals phases in order (tokens before scores before valuemix)', () => {
+    const s = computeAttentionState(3.5 / 7); // partway through 'mask' (idx 3)
+    expect(s.progress.tokens).toBe(1);
+    expect(s.progress.qkv).toBe(1);
+    expect(s.progress.scores).toBe(1);
+    expect(s.progress.valuemix).toBe(0);
+    expect(s.progress.multihead).toBe(0);
   });
 
-  it('phases activate in order (q < k < pairs < score < softmax < v < output ordering at mid)', () => {
-    const out = computeLayerOpacities(0.5);
-    expect(out.q).toBeGreaterThanOrEqual(out.k);
-    expect(out.k).toBeGreaterThanOrEqual(out.score);
-    expect(out.score).toBeGreaterThanOrEqual(out.v);
+  it('beamPulse stays within [0,1] and the active phase tracks t', () => {
+    const s = computeAttentionState(2.5 / 7); // within 'scores' (idx 2)
+    expect(s.phase).toBe('scores');
+    expect(s.beamPulse).toBeGreaterThanOrEqual(0);
+    expect(s.beamPulse).toBeLessThanOrEqual(1);
   });
 });

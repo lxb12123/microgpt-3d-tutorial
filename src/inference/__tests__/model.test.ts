@@ -21,9 +21,9 @@ describe('gpt forward', () => {
 
   it('captures named intermediates when requested', () => {
     const result = gpt([weights._bos_id, 0, 1, 2], weights, {
-      capture: ['attention_scores', 'mlp_pre_relu', 'logits'],
+      capture: ['attention_logits', 'mlp_pre_relu', 'logits'],
     });
-    expect(result.captures.attention_scores).toBeDefined();
+    expect(result.captures.attention_logits).toBeDefined();
     expect(result.captures.mlp_pre_relu).toBeDefined();
     expect(result.captures.logits).toBeDefined();
   });
@@ -41,9 +41,27 @@ describe('gpt forward — attention internals captures', () => {
     expect(r.captures.v_per_head![0][0][0].length).toBe(4);
   });
 
-  it('attention_softmax is an alias of attention_scores (same numerical content)', () => {
-    const r = gpt([0, 1, 2], weights, { capture: ['attention_scores', 'attention_softmax'] });
-    expect(r.captures.attention_softmax).toEqual(r.captures.attention_scores);
+  it('attention_logits and attention_softmax are DISTINCT concepts (raw scores vs weights)', () => {
+    const r = gpt([0, 1, 2], weights, { capture: ['attention_logits', 'attention_softmax', 'q_per_head', 'k_per_head'] });
+    const logits = r.captures.attention_logits!;
+    const softmax = r.captures.attention_softmax!;
+    // Same shape, but NOT the same numbers (softmax normalises; logits are raw).
+    expect(softmax).not.toEqual(logits);
+
+    // Each softmax row sums to 1 over the visible (j<=i) positions.
+    for (const head of softmax[0]) {
+      for (const row of head) {
+        const sum = row.reduce((a, b) => a + b, 0);
+        expect(sum).toBeCloseTo(1, 6);
+      }
+    }
+
+    // The raw logit equals q_i·k_j / sqrt(head_dim).
+    const q = r.captures.q_per_head![0], k = r.captures.k_per_head![0];
+    const d = q[0][0].length;            // head_dim
+    const h = 0, i = 2, j = 1;
+    const dot = q[h][i].reduce((a, qd, idx) => a + qd * k[h][j][idx], 0);
+    expect(logits[0][h][i][j]).toBeCloseTo(dot / Math.sqrt(d), 6);
   });
 
   it('captures per-head output (post-weighted-sum, pre-wo-projection) [layer][head][t][head_dim]', () => {
