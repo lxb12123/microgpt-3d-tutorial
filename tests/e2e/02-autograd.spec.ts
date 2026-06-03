@@ -15,8 +15,8 @@ for (const colorScheme of ['dark', 'light'] as const) {
     // the page into view to trigger it before asserting canvas.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
-    // Wait for the sandbox to compute root value
-    await expect(page.getByText(/root\s*=/i)).toBeVisible({ timeout: 5_000 });
+    // Wait for the sandbox to compute the output value
+    await expect(page.getByText(/output\s*=/i)).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(1_500);
 
     await page.screenshot({ path: `/tmp/phase2-02-autograd-${colorScheme}.png`, fullPage: true });
