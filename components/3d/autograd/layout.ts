@@ -15,30 +15,50 @@
  *        b ─┘  * → root
  *        c ────┘
  *
+ * Framing strategy: rather than fit a per-expression camera (which fought the
+ * responsive canvas aspect and cropped deep graphs), we normalise. The node
+ * bbox is centred at the origin and the WHOLE scene is rendered inside one
+ * `<group scale={groupScale} position={[0, groupY, 0]}>`: the graph is scaled to
+ * fit a fixed world box and dropped into the lower part of a FIXED camera's
+ * view, leaving a band at the top for the overlay HUD. Deep graphs just scale
+ * down — they never crop.
+ *
  * Pure function (no React / no three) so it is unit-testable in jsdom.
  */
 import type { Dag } from './buildDag';
 
 export interface DagLayout {
+  /** Node positions with the node bbox centred at the origin (pre-scale). */
   positions: Record<string, [number, number, number]>;
   bounds: { minX: number; maxX: number; minY: number; maxY: number };
-  /** Front-on camera that frames the whole graph (plus label margin). */
+  /** Uniform scale applied to the whole scene group to fit the fixed frame. */
+  groupScale: number;
+  /** Vertical offset of the scene group (drops the graph below the HUD band). */
+  groupY: number;
+  /** FIXED front-on camera (does not depend on the expression). */
   camera: { position: [number, number, number]; fov: number };
 }
 
 export interface LayoutOptions {
   xGap?: number;
   yGap?: number;
-  fov?: number;
-  /** Canvas aspect (w/h) used to fit the graph horizontally as well as vertically. */
-  aspect?: number;
 }
+
+// Fixed camera + frame. Tuned so the default (a+b)*c renders at a comfortable
+// size with the HUD clear of the top node, and deep graphs scale down to fit.
+const CAM_DISTANCE = 12;
+const CAM_FOV = 42;
+const GROUP_Y = -0.6;          // centre the graph in the band below the HUD
+// World half-extents the CUBE bbox may occupy. Generous screen margin is left
+// around it for the fixed-size floating HTML labels (which don't scale).
+const TARGET_HALF_W = 3.2;
+const TARGET_HALF_H = 2.4;
+const MAX_SCALE = 0.85;         // don't blow small graphs up past a readable size
+const MIN_SCALE = 0.22;
 
 export function layoutDag(dag: Dag, opts: LayoutOptions = {}): DagLayout {
   const xGap = opts.xGap ?? 2.4;
   const yGap = opts.yGap ?? 1.5;
-  const fov = opts.fov ?? 42;
-  const aspect = opts.aspect ?? 1.45;
 
   // children[id] = child ids in left→right edge order (parents consume them).
   const children: Record<string, string[]> = {};
@@ -82,34 +102,28 @@ export function layoutDag(dag: Dag, opts: LayoutOptions = {}): DagLayout {
   const ys = dag.nodes.map((n) => rawPos[n.id][1]);
   const minX0 = Math.min(...xs), maxX0 = Math.max(...xs);
   const minY0 = Math.min(...ys), maxY0 = Math.max(...ys);
+  const cx = (minX0 + maxX0) / 2;
+  const cy = (minY0 + maxY0) / 2;
 
-  // The floating HTML labels extend PAST the node centres, asymmetrically: the
-  // root's value+tag pill juts right, every node's label pill rises above it,
-  // and the leftmost leaf labels jut left. Centre the camera on the bbox PLUS
-  // these pads (not the bare node bbox), so the root label can never clip and
-  // the top row gets headroom that also clears the overlay HUD.
-  const padL = 1.6;  // left leaf labels
-  const padR = 2.8;  // root value readout + "const/derived" tag
-  const padTop = 2.2; // node label pill rises above the cube
-  const padBot = 1.3;
-  const boxMinX = minX0 - padL, boxMaxX = maxX0 + padR;
-  const boxMinY = minY0 - padBot, boxMaxY = maxY0 + padTop;
-  const cx = (boxMinX + boxMaxX) / 2;
-  const cy = (boxMinY + boxMaxY) / 2;
-
+  // Centre the node bbox at the origin (the group offset/scale handles framing).
   const positions: Record<string, [number, number, number]> = {};
   for (const n of dag.nodes) positions[n.id] = [rawPos[n.id][0] - cx, rawPos[n.id][1] - cy, 0];
   const bounds = { minX: minX0 - cx, maxX: maxX0 - cx, minY: minY0 - cy, maxY: maxY0 - cy };
 
-  // Distance to frame the padded box both ways (front-on camera at the origin).
-  const halfW = (boxMaxX - boxMinX) / 2;
-  const halfH = (boxMaxY - boxMinY) / 2;
-  const tanV = Math.tan((fov * Math.PI) / 180 / 2);
-  const distance = Math.max(halfH / tanV, halfW / (tanV * aspect), 6);
+  // Scale the cube bbox into the fixed target box. Single-node graphs (half
+  // extent 0) just take MAX_SCALE.
+  const rawHalfW = Math.max((maxX0 - minX0) / 2, 1e-3);
+  const rawHalfH = Math.max((maxY0 - minY0) / 2, 1e-3);
+  const groupScale = Math.min(
+    MAX_SCALE,
+    Math.max(MIN_SCALE, Math.min(TARGET_HALF_W / rawHalfW, TARGET_HALF_H / rawHalfH)),
+  );
 
   return {
     positions,
     bounds,
-    camera: { position: [0, 0, distance], fov },
+    groupScale,
+    groupY: GROUP_Y,
+    camera: { position: [0, 0, CAM_DISTANCE], fov: CAM_FOV },
   };
 }

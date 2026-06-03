@@ -36,7 +36,7 @@ describe('layoutDag', () => {
     expect(yplus).toBeCloseTo((ya + yb) / 2, 9);
   });
 
-  it('produces only finite coordinates and a camera that backs off enough', () => {
+  it('produces finite coords, a fixed camera, and a centred node bbox', () => {
     const dag = buildDag(parse('(a + b) * c'), { a: 2, b: -3, c: 10 });
     const { positions, camera, bounds } = layoutDag(dag);
     for (const n of dag.nodes) {
@@ -46,17 +46,25 @@ describe('layoutDag', () => {
     }
     expect(camera.position[2]).toBeGreaterThanOrEqual(6);
     expect(Number.isFinite(camera.fov)).toBe(true);
-    // The node bbox centre is shifted LEFT of the origin so the root's label
-    // pill (which juts right) gets framed — i.e. the root is never clipped.
-    expect((bounds.minX + bounds.maxX) / 2).toBeLessThan(0);
-    expect(Number.isFinite(bounds.minX)).toBe(true);
-    expect(Number.isFinite(bounds.maxX)).toBe(true);
+    // Node bbox is centred at the origin (the group scale/offset frames it).
+    expect((bounds.minX + bounds.maxX) / 2).toBeCloseTo(0, 9);
+  });
+
+  it('scales deep graphs down more than shallow ones so they never crop', () => {
+    const shallow = layoutDag(buildDag(parse('(a + b) * c'), { a: 2, b: -3, c: 10 }));
+    const deep = layoutDag(buildDag(parse('1 / (1 + exp(0 - x))'), { x: 0.5 }));
+    expect(shallow.groupScale).toBeGreaterThan(0);
+    expect(shallow.groupScale).toBeLessThanOrEqual(1);
+    // the deeper/wider graph gets a smaller uniform scale so it never crops
+    expect(deep.groupScale).toBeLessThan(shallow.groupScale);
   });
 
   it('handles a single-leaf expression without NaN', () => {
     const dag = buildDag(parse('a'), { a: 3 });
-    const { positions } = layoutDag(dag);
+    const { positions, groupScale } = layoutDag(dag);
     const p = positions[dag.nodes[0].id];
     expect(p.every(Number.isFinite)).toBe(true);
+    expect(Number.isFinite(groupScale)).toBe(true);
+    expect(groupScale).toBeGreaterThan(0);
   });
 });

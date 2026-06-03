@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { SceneViewer } from '@/components/3d/SceneViewer';
+import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
 import { ModeSelector, PlayPauseScrubber, getSandboxPalette } from '@/components/3d/hud';
@@ -39,6 +39,21 @@ const MODE_ITEMS = [
   { value: 'fwd', label: 'Forward' },
   { value: 'bwd', label: 'Backward' },
 ] as const;
+
+// On the light (cream) theme the default cyberpunk rig (ambient 0.15) renders
+// the lit MeshStandardMaterials muddy — the cyan accent arrows look near-black
+// and the orange cubes go brown. Use a bright, neutral rig so materials show
+// close to their true colour on the light background. Dark theme keeps the
+// SceneViewer default (passing `undefined` falls back to it).
+const LIGHT_RIG: SceneLighting = {
+  ambient: 0.9,
+  hemi: 0.5,
+  hemiColors: ['#ffffff', '#efe9e1'],
+  key: 0.5,
+  keyColor: '#ffffff',
+  rim: 0.18,
+  rimColor: '#ffffff',
+};
 
 const DURATION = 2.4; // seconds for the pulse to sweep the whole graph
 // A node's gradient (backward) / value-pulse (forward) is "revealed" once its
@@ -203,7 +218,9 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
       ))}
       <ModeSelector items={MODE_ITEMS} value={phase} onChange={switchPhase} />
       <PlayPauseScrubber duration={DURATION} position={t * DURATION} onSeek={seek} onTogglePlay={togglePlay} />
-      <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12 }}>
+      {/* Dark pill so the white readout stays legible on the light (cream) bg —
+          bare white text was invisible there. */}
+      <span style={{ color: '#fff', fontFamily: 'monospace', fontSize: 12, background: 'rgba(0,0,0,0.55)', padding: '6px 8px', borderRadius: 6 }}>
         root = {dag.root.data.toFixed(3)}
       </span>
     </div>
@@ -211,15 +228,17 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
 
   return (
     <SceneViewer
-      height="520px"
+      height="620px"
       fallbackImage="/microgpt-3d-tutorial/models/previews/autograd.png"
       hud={hud}
       bgColor={palette.bg}
+      lighting={scheme === 'light' ? LIGHT_RIG : undefined}
       cameraPosition={layout!.camera.position}
       cameraFov={layout!.camera.fov}
     >
       <TimelineClock playing={playing} tRef={tRef} onTick={setT} onEnd={() => setPlaying(false)} />
 
+      <group scale={layout!.groupScale} position={[0, layout!.groupY, 0]}>
       {dag.nodes.map((n) => {
         const a = activations[n.id] ?? 0;
         // Backward: reveal the gradient only once the wavefront (root → leaves)
@@ -297,6 +316,7 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
           </Html>
         );
       })}
+      </group>
     </SceneViewer>
   );
 }
