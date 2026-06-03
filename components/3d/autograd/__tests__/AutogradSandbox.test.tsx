@@ -16,6 +16,7 @@ vi.mock('@react-three/drei', () => {
   return {
     useGLTF,
     Html: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Billboard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     OrbitControls: () => null,
     Instances: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Instance: () => null,
@@ -32,15 +33,21 @@ describe('AutogradSandbox', () => {
     expect(screen.getByLabelText(/^c$/)).toBeInTheDocument();
   });
 
-  it('updates the root data display when a slider value changes', () => {
+  it('updates the output display when a slider value changes', () => {
     render(<AutogradSandbox defaultExpression="a + b" defaultVariables={{ a: 1, b: 2 }} />);
-    expect(screen.getByText(/root.*=.*3/i)).toBeInTheDocument();
+    expect(screen.getByText(/output.*=.*3/i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/^a$/), { target: { value: '10' } });
-    expect(screen.getByText(/root.*=.*12/i)).toBeInTheDocument();
+    expect(screen.getByText(/output.*=.*12/i)).toBeInTheDocument();
   });
 
-  it('shows a "Parse error" card on malformed expressions', () => {
+  it('exposes the local-derivatives and final-gradients toggles', () => {
+    render(<AutogradSandbox defaultExpression="(a + b) * c" defaultVariables={{ a: 2, b: -3, c: 10 }} />);
+    expect(screen.getByText(/local derivatives/i)).toBeInTheDocument();
+    expect(screen.getByText(/final gradients/i)).toBeInTheDocument();
+  });
+
+  it('shows an error card on malformed expressions', () => {
     render(<AutogradSandbox defaultExpression="a + " defaultVariables={{ a: 1 }} />);
-    expect(screen.getByText(/parse error/i)).toBeInTheDocument();
+    expect(screen.getByText(/cannot build graph/i)).toBeInTheDocument();
   });
 });

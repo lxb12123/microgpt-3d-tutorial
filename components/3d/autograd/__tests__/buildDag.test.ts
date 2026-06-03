@@ -69,7 +69,7 @@ describe('buildDag', () => {
   });
 
   it('rejects a variable exponent (a ** b) instead of silently zeroing its grad', () => {
-    expect(() => buildDag(parse('a ** b'), { a: 2, b: 3 })).toThrow(/exponent must be a number literal/i);
+    expect(() => buildDag(parse('a ** b'), { a: 2, b: 3 })).toThrow(/Exponent must be a numeric constant/i);
   });
 
   it('throws on unknown variable', () => {

@@ -84,7 +84,7 @@ export function buildDag(ast: AstNode, vars: Record<string, number>): Dag {
       // so accepting it would silently leave the exponent's gradient at 0 and
       // draw a misleading gradient arrow into it. Reject it up front instead.
       if (n.right.type !== 'num') {
-        throw new Error('buildDag: exponent must be a number literal (e.g. a ** 3); a variable exponent is not differentiable here');
+        throw new Error('Exponent must be a numeric constant in this tiny Value engine.');
       }
       const base = walk(n.left);
       const exp = walk(n.right); // a `const` node by construction

@@ -69,4 +69,6 @@ The TypeScript port in `src/inference/value.ts` mirrors this one-for-one — sam
 
 Type any expression using `+ - * / **`, `relu(x)`, `exp(x)`, `log(x)`, single-letter variables, and parentheses. Hit a preset for a starting point. Drag sliders to change variable values. Press **Play** to watch the pulse sweep the graph, or scrub the timeline by hand; switching **Forward/Backward** restarts the pulse from the start.
 
+Each node is a small computation chip — a structured card shows its `value` and `grad` (the grad reads `--` until the backward wave reaches it). Two toggles: **local derivatives** annotates the derived ops with their primitive expansion, and **final gradients** reveals every gradient at once (off by default, so the step-by-step backward stays intact). Drag to orbit a little; the view is clamped so the graph always stays readable.
+
 <AutogradSandbox defaultExpression="(a + b) * c" defaultVariables={{ a: 2, b: -3, c: 10 }} />

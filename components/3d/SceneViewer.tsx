@@ -36,6 +36,19 @@ export interface SceneViewerProps {
   cameraPosition?: [number, number, number];
   /** Optional camera field-of-view. Defaults to 50. */
   cameraFov?: number;
+  /** Optional OrbitControls limits (clamp rotation/zoom so the reader can't
+   *  drag the scene to an unreadable angle). When omitted, controls are free. */
+  controls?: OrbitControlsLimits;
+}
+
+export interface OrbitControlsLimits {
+  enablePan?: boolean;
+  minPolarAngle?: number;
+  maxPolarAngle?: number;
+  minAzimuthAngle?: number;
+  maxAzimuthAngle?: number;
+  minDistance?: number;
+  maxDistance?: number;
 }
 
 // Default lighting (cyberpunk-tinted, used when caller doesn't pass a rig).
@@ -73,6 +86,7 @@ export function SceneViewer({
   lighting = DEFAULT_LIGHTING,
   cameraPosition = [3, 3, 3],
   cameraFov = 50,
+  controls,
 }: SceneViewerProps) {
   const webglAvailable = useWebGLAvailable();
 
@@ -104,7 +118,16 @@ export function SceneViewer({
           <directionalLight position={[5, 8, 5]} intensity={lighting.key} color={lighting.keyColor} castShadow={false} />
           <directionalLight position={[-4, 3, -4]} intensity={lighting.rim} color={lighting.rimColor} />
           <Suspense fallback={null}>{children}</Suspense>
-          <OrbitControls makeDefault />
+          <OrbitControls
+            makeDefault
+            enablePan={controls?.enablePan ?? true}
+            minPolarAngle={controls?.minPolarAngle}
+            maxPolarAngle={controls?.maxPolarAngle}
+            minAzimuthAngle={controls?.minAzimuthAngle}
+            maxAzimuthAngle={controls?.maxAzimuthAngle}
+            minDistance={controls?.minDistance}
+            maxDistance={controls?.maxDistance}
+          />
         </Canvas>
       </SceneErrorBoundary>
     </div>

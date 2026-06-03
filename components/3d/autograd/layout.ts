@@ -48,7 +48,7 @@ export interface LayoutOptions {
 // size with the HUD clear of the top node, and deep graphs scale down to fit.
 const CAM_DISTANCE = 12;
 const CAM_FOV = 42;
-const GROUP_Y = -0.6;          // centre the graph in the band below the HUD
+const GROUP_Y = -1.5;          // centre the graph in the band below the (tall) HUD
 // World half-extents the CUBE bbox may occupy. Generous screen margin is left
 // around it for the fixed-size floating HTML labels (which don't scale).
 const TARGET_HALF_W = 3.2;
@@ -57,8 +57,8 @@ const MAX_SCALE = 0.85;         // don't blow small graphs up past a readable si
 const MIN_SCALE = 0.22;
 
 export function layoutDag(dag: Dag, opts: LayoutOptions = {}): DagLayout {
-  const xGap = opts.xGap ?? 2.4;
-  const yGap = opts.yGap ?? 1.5;
+  const xGap = opts.xGap ?? 2.7;
+  const yGap = opts.yGap ?? 1.9;
 
   // children[id] = child ids in left→right edge order (parents consume them).
   const children: Record<string, string[]> = {};
