@@ -58,4 +58,6 @@ Notice the causal structure is built into the call signature: `gpt()` is called 
 
 Pick a sentence (≤6 chars), a **head** (0–3), and the **query token** `i`. Press **Play** to watch the phases — tokens → Q/K/V → scores → mask → softmax → weighted-value sum → multi-head. The toggles show/hide the Q/K/V vectors, raw scores, softmax weights, the masked future, and the multi-head overview. Click an **inspect q·k** button (or a beam label) for the per-dimension dot-product breakdown.
 
+Two colours carry the two stages, top to bottom: **orange** beams are the attention weights from the query to each visible key (upper lane), and **green** beams are the weighted values `wⱼ·vⱼ` flowing from each `Vⱼ` chip down into the output mixer (lower lane). A future token (`j > i`) is masked: its chip greys out and it gets **no** orange edge and **no** green beam.
+
 <AttentionSandbox defaultText="anna" />

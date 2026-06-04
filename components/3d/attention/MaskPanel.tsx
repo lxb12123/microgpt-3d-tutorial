@@ -1,6 +1,6 @@
 'use client';
 
-import { useGLTF, Html } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import { useLayoutEffect, useMemo } from 'react';
 import { type Object3D } from 'three';
 import type { AttentionTheme } from './theme';
@@ -36,19 +36,11 @@ export function MaskPanel({ position, size, theme, reveal }: MaskPanelProps) {
   }, [scene, theme.maskColor, theme.glow, theme.haloMode]);
 
   if (reveal <= 0.02) return null;
+  // The label is intentionally NOT drawn on the panel — it lives in a floating
+  // MaskCallout (with a leader line) so no text sits on top of the red wall.
   return (
     <group position={position} scale={[size[0], size[1] * reveal, 1]}>
       <primitive object={scene as Object3D} />
-      {reveal > 0.6 && (
-        <Html position={[0, 0, 0.1]} center distanceFactor={9} style={{
-          pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'center',
-          fontFamily: 'ui-monospace, monospace', color: theme.maskColor, textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>FUTURE · MASKED</div>
-          <div style={{ fontSize: 8.5, fontWeight: 600, opacity: 0.85 }}>scores exist for teaching only —</div>
-          <div style={{ fontSize: 8.5, fontWeight: 600, opacity: 0.85 }}>removed before softmax</div>
-        </Html>
-      )}
     </group>
   );
 }

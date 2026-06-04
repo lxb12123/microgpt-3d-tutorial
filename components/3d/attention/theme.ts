@@ -17,8 +17,10 @@ export interface AttentionTheme {
   q: string;
   k: string;
   v: string;
-  /** Softmax weight colour (beams + bars once softmaxed). */
+  /** Softmax weight colour (bars + weight labels once softmaxed). */
   weight: string;
+  /** Attention-edge colour: orange query→key beams once they are weights. */
+  attn: string;
   /** Causal mask. */
   maskColor: string;
   maskFill: string;
@@ -49,6 +51,7 @@ const DARK: AttentionTheme = {
   k: '#a78bfa',
   v: '#34d399',
   weight: '#facc15',
+  attn: '#fb923c',
   maskColor: '#f87171',
   maskFill: 'rgba(248,113,113,0.25)',
   edgeInactive: '#334155',
@@ -75,6 +78,7 @@ const LIGHT: AttentionTheme = {
   k: '#7c3aed',
   v: '#059669',
   weight: '#d97706',
+  attn: '#ea580c',
   maskColor: '#ef4444',
   maskFill: 'rgba(239,68,68,0.16)',
   edgeInactive: '#cbd5e1',

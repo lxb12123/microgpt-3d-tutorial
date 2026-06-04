@@ -16,8 +16,10 @@ import { getAttentionTheme } from './theme';
 import { BenchGrid } from '@/components/3d/autograd/BenchGrid';
 import { TokenChip } from './TokenChip';
 import { QKVStrips } from './QKVStrips';
+import { ValueChip } from './ValueChip';
 import { AttentionBeam } from './AttentionBeam';
 import { MaskPanel } from './MaskPanel';
+import { MaskCallout } from './MaskCallout';
 import { OutputMixer } from './OutputMixer';
 import { HeadRing } from './HeadRing';
 import { BeamLabel, WeightBar, MixerLabel } from './AttentionLabels';
@@ -38,8 +40,14 @@ const N_HEAD = 4;
 const DURATION = 4.2;
 
 const GAP = 1.5;
-const TOKEN_Y = 1.6, ATTN_Y = 0.05, MIXER_Y = -1.95, HEAD_Y = -3.0;
-const GROUP_Y = -0.35;
+// Three clear tiers: token row (keys + query) at top → value lane in the middle
+// → output mixer below. Orange beams live in the upper gap, green in the lower.
+const TOKEN_Y = 1.85;          // token chips (keys + query)
+const KEYPORT_Y = TOKEN_Y - 0.6; // where the orange query→key beams land
+const VALUE_Y = -0.3;          // the V_j value-chip lane
+const MIXER_Y = -2.15;         // output mixer
+const HEAD_Y = -3.2;           // multi-head overview
+const GROUP_Y = -0.2;
 
 const LIGHT_RIG: SceneLighting = {
   ambient: 0.58, hemi: 0.45, hemiColors: ['#ffffff', '#dfe6f0'],
@@ -226,49 +234,63 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             </Html>
           )}
 
-          {/* Causal mask over future tokens j>i */}
+          {/* Causal mask over future token chips j>i, with a floating callout
+              (leader line) so no text sits on top of the red wall. */}
           {showMask && qi < T - 1 && (
-            <MaskPanel
-              position={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y, 0.15]}
-              size={[(T - 1 - qi) * GAP + 0.4, 1.05]}
-              theme={theme} reveal={state.progress.mask} />
+            <>
+              <MaskPanel
+                position={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y, 0.15]}
+                size={[(T - 1 - qi) * GAP + 0.4, 1.05]}
+                theme={theme} reveal={state.progress.mask} />
+              <MaskCallout
+                anchor={[tokenX(T - 1) + 0.55, TOKEN_Y + 0.82, 0]}
+                target={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y + 0.42, 0.18]}
+                theme={theme} reveal={state.progress.mask} />
+            </>
           )}
 
-          {/* Query → key beams (scores → weights) */}
+          {/* ORANGE attention lane: query → each visible key (weights). Cyan while
+              still raw scores, orange once softmaxed. Masked keys get no edge. */}
           {state.progress.scores > 0 && view.entries.filter((e) => !e.masked).map((e) => {
             const thickness = 0.02 + 0.12 * e.weight * sm;
-            const color = sm < 0.5 ? theme.q : theme.weight;
-            const from: [number, number, number] = [tokenX(qi), TOKEN_Y - 0.32, 0];
-            const to: [number, number, number] = [tokenX(e.j), ATTN_Y + 0.2, 0];
+            const color = sm < 0.5 ? theme.q : theme.attn;
+            const from: [number, number, number] = [tokenX(qi), TOKEN_Y - 0.35, 0];
+            const to: [number, number, number] = [tokenX(e.j), KEYPORT_Y, 0];
             const pulse = state.phase === 'scores' ? state.beamPulse : -1;
             return (
               <AttentionBeam key={`beam-${e.j}`} from={from} to={to} color={color}
                 thickness={thickness} emissive={(0.5 + 1.6 * sm) * theme.glow}
-                opacity={0.55 + 0.35 * state.progress.scores} pulse={pulse} pulseColor={theme.q} />
+                opacity={0.55 + 0.35 * state.progress.scores} pulse={pulse} pulseColor={sm < 0.5 ? theme.q : theme.attn} />
             );
           })}
 
-          {/* Score / weight labels on each visible beam */}
+          {/* Attention-weight labels — sit in the UPPER gap (on the orange lane). */}
           {state.progress.scores > 0.3 && view.entries.filter((e) => !e.masked).map((e) => {
             const showW = sm > 0.4 && showWeights;
             const txt = showW ? `w=${e.weight.toFixed(2)}` : (showScores ? e.score.toFixed(2) : '');
             if (!txt) return null;
             return (
-              <BeamLabel key={`lbl-${e.j}`} position={[tokenX(e.j), ATTN_Y + 0.45, 0.1]} text={txt}
-                theme={theme} accent={showW ? theme.weight : undefined} onClick={() => setSelJ(e.j)} />
+              <BeamLabel key={`lbl-${e.j}`} position={[tokenX(e.j), KEYPORT_Y - 0.42, 0.12]} text={txt}
+                theme={theme} accent={showW ? theme.attn : undefined} onClick={() => setSelJ(e.j)} />
             );
           })}
 
-          {/* Softmax weight bar near the query (sum to 1) */}
+          {/* Softmax weight bar (Σw=1) parked top-left, clear of the mask callout. */}
           {showWeights && sm > 0.4 && (
-            <WeightBar position={[tokenX(qi) + 0.9, TOKEN_Y - 0.1, 0]} theme={theme}
+            <WeightBar position={[tokenX(0) - 1.3, KEYPORT_Y + 0.05, 0]} theme={theme}
               weights={view.entries.filter((e) => !e.masked).map((e) => e.weight)} />
           )}
 
-          {/* Weighted value beams → mixer */}
+          {/* VALUE LANE: a V_j chip under every token (masked ones greyed out). */}
+          {state.progress.valuemix > 0.02 && chars.map((_, i) => (
+            <ValueChip key={`val-${i}`} position={[tokenX(i), VALUE_Y, 0]} theme={theme}
+              index={i} masked={i > qi} reveal={state.progress.valuemix} />
+          ))}
+
+          {/* GREEN value lane: each visible V_j → mixer, thickness ∝ w_j. */}
           {state.progress.valuemix > 0 && view.entries.filter((e) => !e.masked).map((e) => {
-            const from: [number, number, number] = [tokenX(e.j), ATTN_Y - 0.2, 0];
-            const to: [number, number, number] = [tokenX(qi), MIXER_Y + 0.35, 0];
+            const from: [number, number, number] = [tokenX(e.j), VALUE_Y - 0.35, 0];
+            const to: [number, number, number] = [tokenX(qi), MIXER_Y + 0.4, 0];
             const pulse = state.phase === 'valuemix' ? state.beamPulse : -1;
             return (
               <AttentionBeam key={`vbeam-${e.j}`} from={from} to={to} color={theme.v}
@@ -277,10 +299,10 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             );
           })}
 
-          {/* Edge labels making the weighted sum explicit: each value enters as wⱼ·vⱼ */}
+          {/* wⱼ·vⱼ labels — sit in the LOWER gap (on the green lane). */}
           {state.progress.valuemix > 0.5 && view.entries.filter((e) => !e.masked).map((e) => {
             const mx = (tokenX(e.j) + tokenX(qi)) / 2;
-            const my = (ATTN_Y - 0.2 + MIXER_Y + 0.35) / 2;
+            const my = (VALUE_Y - 0.35 + MIXER_Y + 0.4) / 2;
             return (
               <BeamLabel key={`vlbl-${e.j}`} position={[mx, my, 0.12]} text={`${e.weight.toFixed(2)}·v${e.j}`}
                 theme={theme} accent={theme.v} onClick={() => setSelJ(e.j)} />
