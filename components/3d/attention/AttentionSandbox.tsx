@@ -295,22 +295,27 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             );
           })}
 
-          {/* wⱼ·vⱼ labels — sit in the LOWER gap (on the green lane). */}
-          {state.progress.valuemix > 0.5 && view.entries.filter((e) => !e.masked).map((e) => {
-            const mx = (tokenX(e.j) + tokenX(qi)) / 2;
-            const my = (VALUE_Y - 0.35 + MIXER_Y + 0.4) / 2;
+          {/* wⱼ·vⱼ labels — placed UP near each Vⱼ source (so they spread out by
+              token, not bunch at the mixer) and y-staggered so neighbours never
+              collide or clip the output_i card. */}
+          {state.progress.valuemix > 0.5 && view.entries.filter((e) => !e.masked).map((e, idx) => {
+            const t0 = 0.32;
+            const mx = tokenX(e.j) + (tokenX(qi) - tokenX(e.j)) * t0;
+            const yTop = VALUE_Y - 0.35, yBot = MIXER_Y + 0.4;
+            const my = yTop + (yBot - yTop) * t0 + (idx % 2 === 0 ? 0.16 : -0.16);
             return (
               <BeamLabel key={`vlbl-${e.j}`} position={[mx, my, 0.12]} text={`${e.weight.toFixed(2)}·v${e.j}`}
                 theme={theme} accent={theme.v} onClick={() => setSelJ(e.j)} />
             );
           })}
 
-          {/* Output mixer + output_i */}
+          {/* Output mixer + output_i. The card is pushed well clear of the mixer
+              sphere and the converging green beams, clamped to stay in-frame. */}
           {state.progress.valuemix > 0.05 && (
             <>
               <OutputMixer position={[tokenX(qi), MIXER_Y, 0]} theme={theme} reveal={state.progress.valuemix} />
               {state.progress.valuemix > 0.6 && (
-                <MixerLabel position={[tokenX(qi) + 1.1, MIXER_Y, 0]} theme={theme} dims={view.output} />
+                <MixerLabel position={[Math.min(tokenX(qi) + 2.0, 2.7), MIXER_Y, 0]} theme={theme} dims={view.output} />
               )}
             </>
           )}
