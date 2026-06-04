@@ -14,7 +14,10 @@ The whole layer does this **per head** in parallel; each head gets its own slice
 The sandbox below is a **token communication lab** for one head and one query token you choose. Watch the query send out **score beams** to each visible key, the **causal mask** wall block the future tokens, the raw scores turn into **softmax weights** (which sum to 1), and the weighted **values** flow into a mixer to form `output_i`. A few things the picture makes explicit:
 
 - **Scores and softmax are different stages.** `attention_logits` (the raw `q·k/√d`) and `attention_softmax` (the weights) are captured separately from the real model — the beams show the scores first, then re-label as weights.
-- **Masked future tokens never enter the softmax.** The mask is applied *before* softmax, so the weights only normalise over `j ≤ i`.
+- **Masked future tokens never enter the softmax.** A score `q_i·k_j` *can* be computed for a future key `j > i` (and the lab shows the mask wall over those positions purely to make the rule visible), but the mask is applied **before** softmax — the model never lets a future token participate, and the weights only normalise over `j ≤ i`.
+- **The Q/K/V strips are labels, not magnitudes.** The three coloured strips under each token just mark *which* projection is the query, key, and value — their length is illustrative. The actual numbers live in the `q·k` breakdown panel.
+- **The value beams are a weighted sum.** Each visible value flows into the mixer tagged `wⱼ·vⱼ`; the mixer adds them up to `output_i = Σ wⱼ·vⱼ`.
+- **Multi-head is real, not decoration.** Each ring in the bottom row shows that head's *own* softmax distribution over the same keys — flip between heads (or watch the mini-bars) and you'll see different heads focus on different positions.
 - **This is one selected head.** `output_i` here is that head's output. The full layer runs all heads in parallel, then **concatenates** their outputs and projects them with `W_o`.
 
 ## Annotated Code

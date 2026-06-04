@@ -15,10 +15,12 @@ export interface HeadRingProps {
   color: string;
   selected: boolean;
   reveal: number;
+  /** This head's real softmax weights over the visible keys (j ≤ query). */
+  weights?: number[];
   onClick?: () => void;
 }
 
-export function HeadRing({ position, theme, index, color, selected, reveal, onClick }: HeadRingProps) {
+export function HeadRing({ position, theme, index, color, selected, reveal, weights, onClick }: HeadRingProps) {
   const gltf = useGLTF(URL);
   const scene = useMemo(() => cloneGlb(gltf.scene), [gltf.scene]);
 
@@ -38,16 +40,34 @@ export function HeadRing({ position, theme, index, color, selected, reveal, onCl
 
   if (reveal <= 0.02) return null;
   const s = (selected ? 1.35 : 0.85) * Math.min(1, reveal);
+  const peak = weights && weights.length ? Math.max(...weights) : 0;
   return (
     <group position={position} scale={s} onClick={onClick}>
       <primitive object={scene as Object3D} />
-      <Html position={[0, 0, 0.1]} center distanceFactor={9} style={{
+      <Html position={[0, 0.04, 0.1]} center distanceFactor={9} style={{
         pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
         fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700,
         color: selected ? color : theme.cardMuted,
       }}>
         h{index}
       </Html>
+      {/* This head's real attention distribution over the visible keys — each
+          head peaks on a different key, so the bars actually differ per head. */}
+      {weights && weights.length > 0 && (
+        <Html position={[0, -0.34, 0.1]} center distanceFactor={9} style={{
+          pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 16 }}>
+            {weights.map((w, j) => (
+              <div key={j} title={`key ${j}: w=${w.toFixed(2)}`} style={{
+                width: 4,
+                height: `${Math.max(1.5, (peak > 0 ? w / peak : 0) * 16)}px`,
+                background: color, borderRadius: 1, opacity: selected ? 1 : 0.6,
+              }} />
+            ))}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }

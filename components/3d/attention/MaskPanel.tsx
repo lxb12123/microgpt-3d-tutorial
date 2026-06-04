@@ -41,11 +41,12 @@ export function MaskPanel({ position, size, theme, reveal }: MaskPanelProps) {
       <primitive object={scene as Object3D} />
       {reveal > 0.6 && (
         <Html position={[0, 0, 0.1]} center distanceFactor={9} style={{
-          pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
-          fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700,
-          color: theme.maskColor, textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+          pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'center',
+          fontFamily: 'ui-monospace, monospace', color: theme.maskColor, textShadow: '0 1px 2px rgba(0,0,0,0.4)',
         }}>
-          cannot see future
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>FUTURE · MASKED</div>
+          <div style={{ fontSize: 8.5, fontWeight: 600, opacity: 0.85 }}>scores exist for teaching only —</div>
+          <div style={{ fontSize: 8.5, fontWeight: 600, opacity: 0.85 }}>removed before softmax</div>
         </Html>
       )}
     </group>

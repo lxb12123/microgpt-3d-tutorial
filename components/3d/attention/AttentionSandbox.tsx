@@ -3,6 +3,7 @@
 import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
 import { PlayPauseScrubber } from '@/components/3d/hud';
 import { gpt } from '@/src/inference/model';
@@ -106,6 +107,14 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
 
   const state = computeAttentionState(t);
   const view = ok ? deriveAttention(ok.captures!, head, qi) : null;
+  // Each head's REAL softmax distribution over the visible keys for this query —
+  // so the multi-head overview shows genuinely different patterns, not decoration.
+  const headWeights = ok
+    ? Array.from({ length: N_HEAD }, (_, hi) => {
+        try { return deriveAttention(ok.captures!, hi, qi).entries.filter((e) => !e.masked).map((e) => e.weight); }
+        catch { return [] as number[]; }
+      })
+    : [];
 
   const tokenX = (i: number) => (i - (T - 1) / 2) * GAP;
   const chars = ok ? ok.ids.map((id) => (id === ok.tokenizer!.bosId ? 'START' : weights._vocab[id] ?? '·')) : [];
@@ -203,6 +212,19 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
           {showQKV && chars.map((_, i) => (
             <QKVStrips key={`qkv-${i}`} position={[tokenX(i), TOKEN_Y - 0.62, 0]} theme={theme} reveal={state.progress.qkv} isQuery={i === qi} />
           ))}
+          {/* Legend: the strips mark which projection is which — length is not a value. */}
+          {showQKV && state.progress.qkv > 0.5 && (
+            <Html position={[tokenX(0) - 1.0, TOKEN_Y - 0.9, 0]} center distanceFactor={9} style={{
+              pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'left',
+              fontFamily: 'ui-monospace, monospace', fontSize: 9, color: theme.cardMuted,
+              background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, borderRadius: 5, padding: '3px 6px',
+            }}>
+              <span style={{ color: theme.q, fontWeight: 700 }}>Q</span>{' '}
+              <span style={{ color: theme.k, fontWeight: 700 }}>K</span>{' '}
+              <span style={{ color: theme.v, fontWeight: 700 }}>V</span>{' '}projections
+              <div style={{ opacity: 0.8 }}>(bar length is illustrative, not the value)</div>
+            </Html>
+          )}
 
           {/* Causal mask over future tokens j>i */}
           {showMask && qi < T - 1 && (
@@ -255,6 +277,16 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             );
           })}
 
+          {/* Edge labels making the weighted sum explicit: each value enters as wⱼ·vⱼ */}
+          {state.progress.valuemix > 0.5 && view.entries.filter((e) => !e.masked).map((e) => {
+            const mx = (tokenX(e.j) + tokenX(qi)) / 2;
+            const my = (ATTN_Y - 0.2 + MIXER_Y + 0.35) / 2;
+            return (
+              <BeamLabel key={`vlbl-${e.j}`} position={[mx, my, 0.12]} text={`${e.weight.toFixed(2)}·v${e.j}`}
+                theme={theme} accent={theme.v} onClick={() => setSelJ(e.j)} />
+            );
+          })}
+
           {/* Output mixer + output_i */}
           {state.progress.valuemix > 0.05 && (
             <>
@@ -272,9 +304,20 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             return (
               <HeadRing key={`head-${hi}`} position={[x, HEAD_Y, 0]} theme={theme} index={hi}
                 color={colors[hi % colors.length]} selected={hi === head} reveal={state.progress.multihead}
+                weights={headWeights[hi]}
                 onClick={() => { setHead(hi); setSelJ(null); }} />
             );
           })}
+          {/* Caption for the multi-head row: each ring shows that head's real
+              attention distribution over the same keys — they genuinely differ. */}
+          {showHeads && state.progress.multihead > 0.6 && (
+            <Html position={[0, HEAD_Y - 0.85, 0]} center distanceFactor={9} style={{
+              pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap', textAlign: 'center',
+              fontFamily: 'ui-monospace, monospace', fontSize: 9, color: theme.cardMuted,
+            }}>
+              each head&apos;s own attention over keys j ≤ {qi} — different heads, different focus
+            </Html>
+          )}
         </group>
       )}
     </SceneViewer>
