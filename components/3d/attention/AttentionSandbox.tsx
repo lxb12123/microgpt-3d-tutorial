@@ -19,7 +19,6 @@ import { QKVStrips } from './QKVStrips';
 import { ValueChip } from './ValueChip';
 import { AttentionBeam } from './AttentionBeam';
 import { MaskPanel } from './MaskPanel';
-import { MaskCallout } from './MaskCallout';
 import { OutputMixer } from './OutputMixer';
 import { HeadRing } from './HeadRing';
 import { BeamLabel, WeightBar, MixerLabel } from './AttentionLabels';
@@ -234,19 +233,16 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
             </Html>
           )}
 
-          {/* Causal mask over future token chips j>i, with a floating callout
-              (leader line) so no text sits on top of the red wall. */}
+          {/* Causal mask over future token chips j>i. MaskPanel draws its own
+              compact label off to the upper-right (with a leader line), so no
+              text sits on the red wall. The offset's effective half-width is
+              clamped so the card stays in-frame even when the region is wide. */}
           {showMask && qi < T - 1 && (
-            <>
-              <MaskPanel
-                position={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y, 0.15]}
-                size={[(T - 1 - qi) * GAP + 0.4, 1.05]}
-                theme={theme} reveal={state.progress.mask} />
-              <MaskCallout
-                anchor={[tokenX(T - 1) + 0.55, TOKEN_Y + 0.82, 0]}
-                target={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y + 0.42, 0.18]}
-                theme={theme} reveal={state.progress.mask} />
-            </>
+            <MaskPanel
+              position={[(tokenX(qi + 1) + tokenX(T - 1)) / 2, TOKEN_Y, 0.15]}
+              size={[(T - 1 - qi) * GAP + 0.4, 1.05]}
+              labelOffset={[Math.min((T - 1 - qi) * GAP + 0.4, 2.0) / 2 + 0.5, 0.85, 0.2]}
+              theme={theme} reveal={state.progress.mask} />
           )}
 
           {/* ORANGE attention lane: query → each visible key (weights). Cyan while
