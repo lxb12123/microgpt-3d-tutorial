@@ -1,131 +1,128 @@
 'use client';
 
 import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 import { useSyncExternalStore } from 'react';
-import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
+import { Billboard } from '@react-three/drei';
+import { SceneViewer } from '@/components/3d/SceneViewer';
+import { SceneText } from '@/components/3d/overview/scene/SceneText';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
 import { TokenCube } from '@/components/3d/primitives/TokenCube';
 import { MatrixGrid } from '@/components/3d/primitives/MatrixGrid';
+import { LegendZone } from '@/components/3d/home/LegendZone';
+import { FitCamera } from '@/components/3d/home/FitCamera';
+import { usePrefersReducedMotion } from '@/components/3d/home/useReducedMotion';
+import { useCompactLayout } from '@/components/3d/home/useViewport';
+import { LIGHT_PALETTE, DARK_PALETTE, type HomePalette } from '@/components/3d/home/palette';
 
-// A theme palette bundles everything that needs to flip between Nextra's
-// light and dark modes: page/stage backgrounds, body/accent material tints,
-// floor grid, the matrix's value→color mapper, and the lighting rig.
-interface Palette {
-  pageBg: string;
-  stageBg: string;
-  body: string;
-  arrowBody: string;
-  gridColors: readonly [string, string];
-  accent: string;
-  accentStrength: number;
-  cellColorFn: (v: number) => string;
-  lighting: SceneLighting;
-  // Whether x/y NodeBlocks should lerp their body color with camera azimuth.
-  // Dark mode needs this for the slate↔dark-slate brightness wash that proves
-  // the angle-driven recolor works. Light mode uses a saturated body color
-  // (warm orange) where the same lerp would oscillate between bright orange
-  // and dark brown — distracting and off-spec for the static warm look.
-  reactiveColor: boolean;
+// The home hero is a *legend*, not a flowchart: four labeled zones, each
+// showing ONE visual primitive in isolation, with no arrows wiring the zones
+// together. The reader should grasp in ~5s that these are the shared visual
+// words every lesson speaks — Tokens, Compute Nodes, Data Flow, Matrices — and
+// not mistake the layout for a real microGPT execution path.
+
+// Lesson each primitive is the star of — click target + caption.
+const LESSON = {
+  tokens: { path: '/01-overview', caption: 'Overview · Attention' },
+  nodes: { path: '/02-autograd', caption: 'Autograd' },
+  flow: { path: '/02-autograd', caption: 'Overview · Autograd' },
+  matrices: { path: '/03-attention', caption: 'Attention · Overview' },
+};
+
+// Responsive layout. Wide canvases spread the four zones horizontally; narrow
+// phone canvases pull them in and stretch the rows apart vertically, so the
+// camera doesn't have to retreat far to fit the width (which would shrink every
+// label). FitCamera then frames the resulting box head-on on either device.
+interface Layout {
+  xSpread: number;
+  topY: number;
+  botY: number;
+  headingOffset: number;
+  captionOffset: number;
+  titleY: number;
+  subtitleY: number;
+  fit: { halfWidth: number; halfHeight: number; targetY: number };
 }
-
-// Light = warm-orange aesthetic. The body of every NodeBlock / TokenCube is
-// painted in the same amber (#fb923c) as the cyan-equivalent accent, so the
-// whole cube reads as a saturated warm orange against the near-white stage
-// — the look the user signed off on before the isEmissiveAccent fix went in
-// and accidentally desaturated the bodies to slate. Arrows stay neutral
-// gray so they don't blur into the orange cube silhouettes.
-const LIGHT_PALETTE: Palette = {
-  pageBg: '#f4f5f7',
-  stageBg: '#fafafa',
-  body: '#fb923c',
-  arrowBody: '#71717a',
-  gridColors: ['#d4d4d8', '#e4e4e7'] as const,
-  accent: '#fb923c',
-  accentStrength: 0.6,
-  // Dark cells against a light bg — high values opaque/dark, low values
-  // still visibly inked (alpha floored at 0.35) so even the dimmest cell
-  // leaves a faint dark mark rather than vanishing into the near-white stage.
-  cellColorFn: (v: number) => `rgba(40, 40, 60, ${0.35 + v * 0.65})`,
-  lighting: {
-    ambient: 0.6,
-    hemi: 0.8,
-    hemiColors: ['#ffffff', '#e5e5e5'] as const,
-    key: 0.9,
-    keyColor: '#ffffff',
-    rim: 0.5,
-    rimColor: '#fff7ed',
-  },
-  reactiveColor: false,
+const WIDE: Layout = {
+  xSpread: 3.3,
+  topY: 1.25,
+  botY: -1.6,
+  headingOffset: 1.45,
+  captionOffset: 1.12,
+  titleY: 3.5,
+  subtitleY: 3.12,
+  fit: { halfWidth: 5.0, halfHeight: 3.3, targetY: 0.6 },
+};
+const COMPACT: Layout = {
+  xSpread: 2.0,
+  topY: 2.2,
+  botY: -2.4,
+  headingOffset: 1.45,
+  captionOffset: 1.12,
+  titleY: 4.5,
+  subtitleY: 4.12,
+  fit: { halfWidth: 3.55, halfHeight: 4.0, targetY: 0.8 },
 };
 
-// Dark = cyberpunk, but rig neutralized. Previous rig used a magenta-tinted
-// key (#ffccff) plus a saturated cyan rim (#aaffff @ 0.5) which, combined with
-// the cyan emissive accent on the .glb (strength 1.0), painted the slate body
-// uniform cyan-mint regardless of the reactiveColor lerp — the user couldn't
-// see the angle-driven brightness shift at all. Fix: switch the key to slightly
-// warm white (#ffeedd) and the rim to neutral white (#ffffff @ 0.35) so neither
-// light tints the body. Accent strength dropped 1.0 → 0.7 so cyan trim still
-// reads as design accent without dominating. Body lifted #5a6582 → #7a8090 so
-// the bright end (lerp t=1) is visibly distinct from the dark end (#30343a at
-// t=0, i.e. body × 0.4). Result: matte slate cubes that clearly show the
-// angle-driven brightness lerp as the camera orbits, with cyan trim accents.
-const DARK_PALETTE: Palette = {
-  pageBg: '#0a0a14',
-  stageBg: '#06060a',
-  body: '#7a8090',
-  arrowBody: '#7a8090',
-  gridColors: ['#440066', '#330055'] as const,
-  accent: '#00ffff',
-  accentStrength: 0.7,
-  // Lime-green palette: previous magenta (rgb(180,40,140) floor) was confirmed
-  // present in both source and the live `_next/static/chunks/*.js` bundle,
-  // but reads as near-black against the cyan-rim + magenta-key lighting rig
-  // because the rim light desaturates the red channel. Lime green sits at
-  // the opposite end of the color wheel from magenta and survives the rig's
-  // tinted lighting much better. Floor at rgb(80,220,40) — saturated bright
-  // lime, impossible to miss against the near-black stage.
-  // v=0 → rgb(80,220,40), v=0.5 → rgb(130,237,80), v=1 → rgb(180,255,120).
-  cellColorFn: (v: number) => {
-    const r = Math.round(80 + v * 100);
-    const g = Math.round(220 + v * 35);
-    const b = Math.round(40 + v * 80);
-    return `rgb(${r}, ${g}, ${b})`;
-  },
-  lighting: {
-    ambient: 0.08,
-    hemi: 0.2,
-    hemiColors: ['#202840', '#0a0a1a'] as const,
-    key: 1.4,
-    keyColor: '#ffeedd',
-    rim: 0.35,
-    rimColor: '#ffffff',
-  },
-  reactiveColor: true,
-};
+// A 3×4 matrix with a few standout cells so the heat ramp visibly "lights up"
+// part of the grid (spec: dark base + heatmap highlights).
+const MATRIX_VALUES = [
+  [0.15, 0.85, 0.25, 0.45],
+  [0.35, 0.1, 0.95, 0.3],
+  [0.6, 0.2, 0.4, 0.8],
+];
+const MATRIX_SPACING = 0.45;
+const MATRIX_ORIGIN: [number, number, number] = [
+  -((MATRIX_VALUES[0].length - 1) * MATRIX_SPACING) / 2, // center horizontally
+  ((MATRIX_VALUES.length - 1) * MATRIX_SPACING) / 2, // center vertically
+  0,
+];
+// The three brightest cells get their value printed on them, in dark ink (the
+// hot amber cells are light enough that black-on-amber reads in either theme).
+const HOT_CELLS: Array<{ r: number; c: number }> = [
+  { r: 0, c: 1 },
+  { r: 1, c: 2 },
+  { r: 2, c: 3 },
+];
 
-// next-themes returns `undefined` on initial SSR + first client render, then
-// resolves the real theme after mount. To avoid hydration mismatch we want a
-// deterministic value on the first render and the real value thereafter.
-// `useSyncExternalStore` gives us exactly that without an effect+setState
-// dance (same pattern SceneViewer uses for WebGL detection): the server
-// snapshot pins the initial render to "dark", and the client snapshot picks
-// up the real theme on every subsequent render.
+// next-themes returns undefined on SSR+first client render; pin to "dark" then
+// resolve (same pattern the rest of the 3D layer uses).
 const noopSubscribe = () => () => {};
 function useResolvedTheme(): 'light' | 'dark' {
   const { resolvedTheme } = useTheme();
-  const mounted = useSyncExternalStore(
-    noopSubscribe,
-    () => true,   // client snapshot
-    () => false,  // server snapshot
-  );
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   if (!mounted) return 'dark';
   return resolvedTheme === 'light' ? 'light' : 'dark';
 }
 
 export function HomeHero() {
   const theme = useResolvedTheme();
-  const p = theme === 'light' ? LIGHT_PALETTE : DARK_PALETTE;
+  const p: HomePalette = theme === 'light' ? LIGHT_PALETTE : DARK_PALETTE;
+  const reduced = usePrefersReducedMotion();
+  const animate = !reduced;
+  const compact = useCompactLayout();
+  const L = compact ? COMPACT : WIDE;
+  const router = useRouter();
+
+  // 2×2 grid slots derived from the active layout.
+  const slot = {
+    tokens: [-L.xSpread, L.topY, 0] as [number, number, number],
+    nodes: [L.xSpread, L.topY, 0] as [number, number, number],
+    flow: [-L.xSpread, L.botY, 0] as [number, number, number],
+    matrices: [L.xSpread, L.botY, 0] as [number, number, number],
+  };
+
+  // Props shared by every zone heading.
+  const zoneChrome = {
+    labelColor: p.labelColor,
+    captionColor: p.captionColor,
+    halo: p.halo,
+    card: p.card,
+    float: animate,
+    headingOffset: L.headingOffset,
+    captionOffset: L.captionOffset,
+  };
 
   return (
     <div
@@ -141,84 +138,192 @@ export function HomeHero() {
         fallbackImage="/microgpt-3d-tutorial/models/previews/hello.png"
         bgColor={p.stageBg}
         lighting={p.lighting}
+        cameraPosition={[0, L.fit.targetY, 12]}
+        cameraFov={50}
+        controls={{
+          enablePan: false,
+          enableZoom: false,
+          // Allow a small, readable orbit — never top-down or behind.
+          minPolarAngle: Math.PI / 2 - 0.42,
+          maxPolarAngle: Math.PI / 2 + 0.18,
+          minAzimuthAngle: -0.5,
+          maxAzimuthAngle: 0.5,
+        }}
       >
-        {/* Floor grid sets the stage tone — soft gray for light,
-            purple/magenta for dark. */}
-        <gridHelper args={[20, 40, p.gridColors[0], p.gridColors[1]]} position={[0, -2, 0]} />
-        {/* x and y NodeBlocks use angle-driven reactiveColor: the body color
-            interpolates as a pure function of the camera azimuth (reversible
-            on counter-rotation, no time-based pulse). `glow` is intentionally
-            omitted on `y` — its emissive sine pulse reads as an unwanted
-            color shift over time. */}
-        <NodeBlock
-          position={[-3, 1, 0]}
-          label="x"
-          reactiveColor={p.reactiveColor}
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <NodeBlock
-          position={[-3, -1, 0]}
-          label="y"
-          reactiveColor={p.reactiveColor}
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <ConnectorArrow
-          from={[-3, 1, 0]}
-          to={[-1, 0, 0]}
-          color={p.arrowBody}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <ConnectorArrow
-          from={[-3, -1, 0]}
-          to={[-1, 0, 0]}
-          color={p.arrowBody}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <TokenCube
-          position={[1, 1, 0]}
-          char="a"
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <TokenCube
-          position={[1.7, 1, 0]}
-          char="n"
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <TokenCube
-          position={[2.4, 1, 0]}
-          char="n"
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <TokenCube
-          position={[3.1, 1, 0]}
-          char="a"
-          color={p.body}
-          accentColor={p.accent}
-          accentStrength={p.accentStrength}
-        />
-        <MatrixGrid
-          rows={3}
-          cols={4}
-          values={[
-            [0.1, 0.3, 0.5, 0.7],
-            [0.9, 0.2, 0.4, 0.6],
-            [0.5, 0.8, 0.1, 0.3],
-          ]}
-          origin={[1, -0.5, 0]}
-          cellColorFn={p.cellColorFn}
-        />
+        {/* Frame the legend to fit the current viewport, head-on. */}
+        <FitCamera halfWidth={L.fit.halfWidth} halfHeight={L.fit.halfHeight} targetY={L.fit.targetY} />
+
+        {/* Faint floor grid for stage tone (no role in the legend itself). */}
+        <gridHelper args={[20, 40, p.gridColors[0], p.gridColors[1]]} position={[0, L.botY - 1.2, 0]} />
+
+        {/* Scene title — names this as a vocabulary legend, not an architecture. */}
+        <Billboard position={[0, L.titleY, 0]}>
+          <SceneText fontSize={0.3} color={p.labelColor} outlineColor={p.halo} outlineWidth={0.016}>
+            microGPT&apos;s visual vocabulary
+          </SceneText>
+        </Billboard>
+        <Billboard position={[0, L.subtitleY, 0]}>
+          <SceneText fontSize={0.16} color={p.captionColor} outlineColor={p.halo} outlineWidth={0.008}>
+            hover to learn · click to open a lesson
+          </SceneText>
+        </Billboard>
+
+        {/* ── Tokens: character tokens fed into the model ── */}
+        <LegendZone
+          {...zoneChrome}
+          center={slot.tokens}
+          title="Tokens"
+          caption={LESSON.tokens.caption}
+          tooltip="Character tokens fed in — e.g. a n n a"
+          accentColor={p.token.accent}
+          floatPhase={0}
+          onNavigate={() => router.push(LESSON.tokens.path)}
+        >
+          {(['a', 'n', 'n', 'a'] as const).map((ch, i) => (
+            <TokenCube
+              key={i}
+              position={[-1.05 + i * 0.7, 0, 0]}
+              char={ch}
+              color={p.token.body}
+              accentColor={p.token.accent}
+              accentStrength={p.token.strength}
+            />
+          ))}
+        </LegendZone>
+
+        {/* ── Compute Nodes: a value with its number and gradient ── */}
+        <LegendZone
+          {...zoneChrome}
+          center={slot.nodes}
+          title="Compute Nodes"
+          caption={LESSON.nodes.caption}
+          tooltip="A value in the graph, with its number and gradient"
+          accentColor={p.node.accent}
+          floatPhase={1.6}
+          onNavigate={() => router.push(LESSON.nodes.path)}
+        >
+          {/* Two stacked node blocks (scaled down so the zone doesn't crowd its
+              caption or the Matrices zone below). Their example values are
+              in-scene SDF text beside each cube — crisp and theme-aware. */}
+          <group position={[-0.6, 0.5, 0]} scale={0.72}>
+            <NodeBlock position={[0, 0, 0]} color={p.node.body} accentColor={p.node.accent} accentStrength={p.node.strength} />
+          </group>
+          <SceneText position={[-0.05, 0.5, 0]} anchorX="left" fontSize={0.2} color={p.labelColor} outlineColor={p.halo} outlineWidth={0.01}>
+            x = 2.0
+          </SceneText>
+          <group position={[-0.6, -0.55, 0]} scale={0.72}>
+            <NodeBlock position={[0, 0, 0]} color={p.node.body} accentColor={p.node.accent} accentStrength={p.node.strength} />
+          </group>
+          <SceneText position={[-0.05, -0.55, 0]} anchorX="left" fontSize={0.2} color={p.labelColor} outlineColor={p.halo} outlineWidth={0.01}>
+            grad = 0.4
+          </SceneText>
+        </LegendZone>
+
+        {/* ── Data Flow: direction of data (forward) / gradients (backward) ── */}
+        <LegendZone
+          {...zoneChrome}
+          center={slot.flow}
+          title="Data Flow"
+          caption={LESSON.flow.caption}
+          tooltip="Which way data flows forward — or gradients flow back"
+          accentColor={p.arrow.accent}
+          floatPhase={3.1}
+          onNavigate={() => router.push(LESSON.flow.path)}
+        >
+          {/* Forward (data) — clear start dot, arrowhead marks the end. */}
+          <mesh position={[-1.1, 0.3, 0]}>
+            <sphereGeometry args={[0.08, 16, 16]} />
+            <meshStandardMaterial color={p.arrow.body} roughness={0.5} />
+          </mesh>
+          <ConnectorArrow
+            from={[-1.1, 0.3, 0]}
+            to={[1.0, 0.3, 0]}
+            color={p.arrow.body}
+            accentColor={p.arrow.accent}
+            accentStrength={p.arrow.strength}
+            animatedDash={animate}
+          />
+          <SceneText position={[0, 0.62, 0]} fontSize={0.16} color={p.captionColor} outlineColor={p.halo} outlineWidth={0.008}>
+            data →
+          </SceneText>
+          {/* Backward (gradient) — opposite direction, same green semantics. */}
+          <mesh position={[1.1, -0.4, 0]}>
+            <sphereGeometry args={[0.08, 16, 16]} />
+            <meshStandardMaterial color={p.arrow.body} roughness={0.5} />
+          </mesh>
+          <ConnectorArrow
+            from={[1.1, -0.4, 0]}
+            to={[-1.0, -0.4, 0]}
+            color={p.arrow.body}
+            accentColor={p.arrow.accent}
+            accentStrength={p.arrow.strength}
+            animatedDash={animate}
+          />
+          <SceneText position={[0, -0.72, 0]} fontSize={0.16} color={p.captionColor} outlineColor={p.halo} outlineWidth={0.008}>
+            ← grad
+          </SceneText>
+        </LegendZone>
+
+        {/* ── Matrices: weights / probabilities / attention scores ── */}
+        <LegendZone
+          {...zoneChrome}
+          center={slot.matrices}
+          title="Matrices"
+          caption={LESSON.matrices.caption}
+          tooltip="A grid of weights, probabilities or attention scores"
+          accentColor="#fbbf24"
+          floatPhase={4.6}
+          onNavigate={() => router.push(LESSON.matrices.path)}
+        >
+          <MatrixGrid
+            rows={MATRIX_VALUES.length}
+            cols={MATRIX_VALUES[0].length}
+            values={MATRIX_VALUES}
+            origin={MATRIX_ORIGIN}
+            spacing={MATRIX_SPACING}
+            cellColorFn={p.heatCell}
+          />
+          {/* Column headers c0..c3 and row headers r0..r2 — make the grid's
+              row/column structure explicit. */}
+          {MATRIX_VALUES[0].map((_, c) => (
+            <SceneText
+              key={`c${c}`}
+              position={[MATRIX_ORIGIN[0] + c * MATRIX_SPACING, MATRIX_ORIGIN[1] + 0.34, 0]}
+              fontSize={0.13}
+              color={p.captionColor}
+              outlineColor={p.halo}
+              outlineWidth={0.006}
+            >
+              c{c}
+            </SceneText>
+          ))}
+          {MATRIX_VALUES.map((_, r) => (
+            <SceneText
+              key={`r${r}`}
+              position={[MATRIX_ORIGIN[0] - 0.4, MATRIX_ORIGIN[1] - r * MATRIX_SPACING, 0]}
+              fontSize={0.13}
+              color={p.captionColor}
+              outlineColor={p.halo}
+              outlineWidth={0.006}
+            >
+              r{r}
+            </SceneText>
+          ))}
+          {/* Print the value on the brightest cells so "numbers live in the
+              grid" reads at a glance; dark ink stays legible on hot amber. */}
+          {HOT_CELLS.map(({ r, c }) => (
+            <SceneText
+              key={`v${r}-${c}`}
+              position={[MATRIX_ORIGIN[0] + c * MATRIX_SPACING, MATRIX_ORIGIN[1] - r * MATRIX_SPACING, 0.06]}
+              fontSize={0.12}
+              color="#1f2937"
+              outlineColor="#fde68a"
+              outlineWidth={0.004}
+            >
+              {MATRIX_VALUES[r][c].toFixed(2)}
+            </SceneText>
+          ))}
+        </LegendZone>
       </SceneViewer>
     </div>
   );

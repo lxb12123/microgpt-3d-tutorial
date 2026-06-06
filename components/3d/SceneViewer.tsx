@@ -43,6 +43,7 @@ export interface SceneViewerProps {
 
 export interface OrbitControlsLimits {
   enablePan?: boolean;
+  enableZoom?: boolean;
   minPolarAngle?: number;
   maxPolarAngle?: number;
   minAzimuthAngle?: number;
@@ -121,6 +122,7 @@ export function SceneViewer({
           <OrbitControls
             makeDefault
             enablePan={controls?.enablePan ?? true}
+            enableZoom={controls?.enableZoom ?? true}
             minPolarAngle={controls?.minPolarAngle}
             maxPolarAngle={controls?.maxPolarAngle}
             minAzimuthAngle={controls?.minAzimuthAngle}
