@@ -6,6 +6,7 @@ import type { AutogradSandboxProps } from './autograd/AutogradSandbox';
 import type { AttentionSandboxProps } from './attention/AttentionSandbox';
 import type { OverviewSandboxProps } from './overview/OverviewSandbox';
 import type { TransformerBlockSandboxProps } from './transformer/TransformerBlockSandbox';
+import type { TrainingSandboxProps } from './training/TrainingSandbox';
 
 // Per-lesson sandboxes are dynamic-imported (no SSR — they need WebGL) AND
 // gated behind LazyMount so the three.js + drei + R3F chunk only fetches when
@@ -32,6 +33,11 @@ const TransformerBlockSandboxImpl = dynamic(
   { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
 );
 
+const TrainingSandboxImpl = dynamic(
+  () => import('./training/TrainingSandbox').then((m) => m.TrainingSandbox),
+  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+);
+
 const HomeHeroImpl = dynamic(
   () => import('./HomeHero').then((m) => m.HomeHero),
   { ssr: false, loading: () => <p>Loading 3D hero…</p> },
@@ -51,6 +57,10 @@ export function OverviewSandbox(props: OverviewSandboxProps) {
 
 export function TransformerBlockSandbox(props: TransformerBlockSandboxProps) {
   return <LazyMount minHeight={560}><TransformerBlockSandboxImpl {...props} /></LazyMount>;
+}
+
+export function TrainingSandbox(props: TrainingSandboxProps) {
+  return <LazyMount minHeight={560}><TrainingSandboxImpl {...props} /></LazyMount>;
 }
 
 // Homepage hero: a compact gallery of all four primitives (TokenCubes,

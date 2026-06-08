@@ -1,0 +1,77 @@
+# 05 · Training & Generation: The Loop That Closes microGPT
+
+## Theory
+
+Lessons 01–04 built the forward pass. This lesson is the rest of the file: how the weights get *learned* (training) and how the trained model *babbles new names* (generation). Both are short, and both come straight from `src/microgpt_annotated.py`.
+
+### The data and the tokenizer
+
+The dataset `docs` is a shuffled list of names. The vocabulary is just the sorted set of characters that appear:
+
+```python
+uchars = sorted(set(''.join(docs)))  # the characters → token ids 0..n-1
+BOS = len(uchars)                    # one extra sentinel id, AFTER the chars
+vocab_size = len(uchars) + 1         # chars + 1 (the BOS)
+```
+
+`BOS` is a single special token. Every training document is wrapped with it on **both** ends, and each position's **target** is simply the next token:
+
+```python
+tokens = [BOS] + [uchars.index(ch) for ch in doc] + [BOS]
+# predict tokens[pos+1] from tokens[pos]
+```
+
+The leading BOS is "START"; the trailing BOS is the thing the model must learn to predict to say "this name is over".
+
+### Training: forward → loss → backward → Adam
+
+For each position the model produces logits, softmax turns them into probabilities, and the loss is the negative log-probability the model assigned to the *true* next token, averaged over the document:
+
+```python
+probs = softmax(logits)
+loss_t = -probs[target_id].log()
+loss = (1 / n) * sum(losses)     # mean cross-entropy
+loss.backward()                  # the lesson-02 autograd, run on the whole graph
+```
+
+Then **Adam** (not plain SGD) updates every parameter from its gradient. Adam keeps two running buffers per parameter — a first moment `m` (a smoothed gradient) and a second moment `v` (a smoothed squared gradient) — bias-corrects them, and decays the learning rate linearly over training:
+
+```python
+learning_rate, beta1, beta2, eps_adam = 0.01, 0.85, 0.99, 1e-8
+lr_t = learning_rate * (1 - step / num_steps)     # linear LR decay
+for i, p in enumerate(params):
+    m[i] = beta1 * m[i] + (1 - beta1) * p.grad
+    v[i] = beta2 * v[i] + (1 - beta2) * p.grad ** 2
+    m_hat = m[i] / (1 - beta1 ** (step + 1))      # bias correction
+    v_hat = v[i] / (1 - beta2 ** (step + 1))
+    p.data -= lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
+    p.grad = 0                                    # reset for the next step
+```
+
+### Generation: babble back
+
+After training, the model generates one character at a time, starting from BOS, feeding each prediction back as the next input. A **KV cache** (`keys`, `values`) accumulates past context so each new token only does work for itself. **Temperature** divides the logits before softmax — low temperature concentrates the distribution (focused, repetitive), high temperature flattens it (random, creative). It stops when it samples BOS again:
+
+```python
+temperature = 0.5  # in (0, 1]
+for pos_id in range(block_size):
+    logits = gpt(token_id, pos_id, keys, values)
+    probs = softmax([l / temperature for l in logits])
+    token_id = random.choices(range(vocab_size), weights=[p.data for p in probs])[0]
+    if token_id == BOS:
+        break
+    sample.append(uchars[token_id])
+```
+
+## Annotated Code
+
+The training loop is `src/microgpt_annotated.py` Section 5 (subsection `overview-training-step`, py lines 194-226); generation is Section 6 (py lines 234-247). The Adam hyperparameters `learning_rate=0.01, beta1=0.85, beta2=0.99, eps=1e-8` and `num_steps=1000` are the values the shipped weights were trained with.
+
+A note on what this sandbox does and does **not** do. The ~89 KB of weights were trained **offline** by the Python file. The browser does not retrain the whole model — that would take far longer than a page visit. Instead the **Train** mode runs **one real Adam step on the LM head** (the rest of the network held fixed): it tokenizes your document, runs the genuine forward pass for the loss, calls `loss.backward()` through the lesson-02 `Value` engine for a true gradient, and applies the exact Adam formula above. Every number it shows comes from that real computation. The **Generate** mode runs the real model autoregressively at the temperature you choose.
+
+## Sandbox
+
+- **Generate** — watch the model build a name from BOS. Drag **temperature** and the next-character probability bars reshape live (low = focused, high = random); **resample** draws a different name. It stops when it predicts the STOP sentinel.
+- **Train** — type a document and step through data → forward → loss → backward → Adam. The panel shows the real mean cross-entropy and the real `m / v / m̂ / v̂ / lr_t / Δ` for one LM-head parameter, straight from the formula.
+
+<TrainingSandbox defaultDoc="emma" />

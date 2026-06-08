@@ -1,5 +1,5 @@
 import { useMDXComponents as getDocsMDXComponents } from 'nextra-theme-docs';
-import { AutogradSandbox, AttentionSandbox, OverviewSandbox, TransformerBlockSandbox, HomeHero } from '@/components/3d';
+import { AutogradSandbox, AttentionSandbox, OverviewSandbox, TransformerBlockSandbox, TrainingSandbox, HomeHero } from '@/components/3d';
 
 const docsComponents = getDocsMDXComponents();
 
@@ -10,6 +10,7 @@ export function useMDXComponents(components: Record<string, React.ComponentType>
     AttentionSandbox,
     OverviewSandbox,
     TransformerBlockSandbox,
+    TrainingSandbox,
     HomeHero,
     ...components,
   };

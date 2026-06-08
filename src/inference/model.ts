@@ -47,6 +47,9 @@ export interface GptCaptures {
   head_output?: number[][][][];
   /** Per-layer MLP activations after fc1 but before ReLU: [layer][t][4*n_embd]. */
   mlp_pre_relu?: number[][][];
+  /** Final hidden state per position, the input to lm_head: [T][n_embd]. Used by
+   *  lesson 05 to run a real, autograd-backed training step on the LM head. */
+  final_hidden?: number[][];
   /** Final logits as plain numbers: [T][vocab_size]. */
   logits?: number[][];
 }
@@ -278,6 +281,7 @@ export function gpt(
 
   // Project to vocab. Python does *not* apply a final norm before lm_head.
   const lmHead = getMatrix(weights, 'lm_head');
+  const finalHidden = x; // the input to lm_head, captured below if requested
   const logits: Value[][] = x.map((row) => linear(row, lmHead));
 
   // Shape sanity check — defensive but cheap.
@@ -307,6 +311,9 @@ export function gpt(
   }
   if (captureSet.has('mlp_pre_relu')) {
     captures.mlp_pre_relu = mlpPreReluAll;
+  }
+  if (captureSet.has('final_hidden')) {
+    captures.final_hidden = finalHidden.map((row) => row.map((vv) => vv.data));
   }
   if (captureSet.has('logits')) {
     captures.logits = logits.map((row) => row.map((vv) => vv.data));
