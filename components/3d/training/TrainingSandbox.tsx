@@ -241,6 +241,10 @@ function GeneratePanel({ scheme, fullName, temperature, steps }: {
       </div>
       <div>generated name: <b>{fullName || '(empty)'}</b>{stopped ? '  ·  hit STOP sentinel' : ''}</div>
       <div style={{ color: muted(scheme), marginTop: 4 }}>
+        Execution note: Python keeps a growing KV cache; this browser port instead recomputes the
+        complete causal prefix at every step — same logits, no incremental KV cache.
+      </div>
+      <div style={{ color: muted(scheme), marginTop: 4 }}>
         temperature <b style={{ color: scheme === 'light' ? '#b45309' : '#facc15' }}>{temperature.toFixed(2)}</b>{' '}
         scales the logits before softmax. Lower → the distribution sharpens onto the likeliest few
         characters (focused, repetitive). Higher → it flattens toward uniform (random, more varied).
@@ -273,10 +277,12 @@ function TrainPanel({ scheme, train }: {
   return (
     <div style={panelStyle(scheme)} data-testid="train-panel">
       <div style={{ marginBottom: 6 }}>
-        <strong>One training step</strong>{' '}
+        <strong>One gradient + Adam update calculation</strong>{' '}
         <span style={{ color: muted(scheme) }}>
-          data → forward → loss → backward → Adam. This runs a single, real Adam step on the
-          <b> LM head</b> (the rest of the model is frozen); the full model was trained offline in Python.
+          data → forward → loss → backward → Adam, for one
+          <b> LM-head</b> parameter (the rest of the model is frozen). The update below is
+          <b> displayed but not persisted into the loaded model</b>; each input change restarts from
+          fresh Adam buffers at step 0. The full model was trained offline in Python.
         </span>
       </div>
       <div>

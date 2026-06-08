@@ -36,6 +36,14 @@ for (const vp of VIEWPORTS) {
       await expect(playBtn).toBeVisible();
       await playBtn.click();
 
+      // Review fixes: attention stage is a SUMMARY of lesson 03 (not a live reuse),
+      // the Parameter Initialization section exists, and the heading shows "Sandbox"
+      // (the "#" is Nextra's hover-only permalink, never part of the title text).
+      await expect(page.getByText(/summarizes the same computation explained in lesson 03/i)).toBeVisible();
+      await expect(page.getByText('is the lesson-03 computation reused')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: /Parameter Initialization/i })).toBeVisible();
+      await expect(page.locator('h2#sandbox')).toHaveText('Sandbox');
+
       await page.screenshot({ path: `/tmp/04-transformer-${vp.name}-${colorScheme}.png`, fullPage: true });
       expect(errors, `console errors (${vp.name}/${colorScheme}):\n${errors.join('\n')}`).toEqual([]);
     });

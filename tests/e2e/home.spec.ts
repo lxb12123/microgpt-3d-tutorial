@@ -13,5 +13,15 @@ test('home page renders the microGPT 3D landing copy and lesson links', async ({
   await expect(main.getByRole('link', { name: /01 · Overview/i })).toBeVisible();
   await expect(main.getByRole('link', { name: /02 · Autograd/i })).toBeVisible();
   await expect(main.getByRole('link', { name: /03 · Attention/i })).toBeVisible();
+  await expect(main.getByRole('link', { name: /04 · Transformer Block/i })).toBeVisible();
+  await expect(main.getByRole('link', { name: /05 · Training & Generation/i })).toBeVisible();
+
+  // The hero slot is never a bare blank box: a skeleton shows immediately and is
+  // replaced by the WebGL canvas (or SceneViewer's fallback <img>) — assert one of
+  // those is present so a regression to an empty box fails here.
+  await expect(
+    page.locator('[data-testid="hero-skeleton"], canvas, img[alt*="WebGL"]').first(),
+  ).toBeVisible({ timeout: 15_000 });
+
   expect(errors, `unexpected console errors: ${errors.join('\n')}`).toEqual([]);
 });

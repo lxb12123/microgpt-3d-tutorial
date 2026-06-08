@@ -35,6 +35,14 @@ for (const vp of VIEWPORTS) {
       await expect(trainPanel).toContainText(/mean cross-entropy/i);
       await expect(trainPanel).toContainText(/lm_head\[\d+\]\[\d+\]/);
 
+      // Review fixes: explicit KV-cache execution difference, and that the Adam
+      // update is a calculation that is NOT persisted into the loaded model.
+      await expect(page.getByText(/recomputes the complete causal prefix at every generation step/i)).toBeVisible();
+      await expect(page.getByText(/not maintaining an incremental KV cache/i)).toBeVisible();
+      // Stated in both the lesson note and the Train panel — assert at least one.
+      await expect(page.getByText(/not persisted into the loaded model/i).first()).toBeVisible();
+      await expect(page.locator('h2#sandbox')).toHaveText('Sandbox');
+
       await page.screenshot({ path: `/tmp/05-training-${vp.name}-${colorScheme}.png`, fullPage: true });
       expect(errors, `console errors (${vp.name}/${colorScheme}):\n${errors.join('\n')}`).toEqual([]);
     });

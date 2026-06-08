@@ -27,6 +27,36 @@ That's the whole block. Things microGPT deliberately does **not** have, and whic
 
 A note on the two residuals: this is a **pre-norm** transformer. Each sub-block normalizes a *copy* of `x`, runs its sub-layer, and adds the result back to the *un-normalized* `x` it saved. That saved-then-added bypass is drawn as the two arcs on the right of the scene.
 
+### Parameter Initialization
+
+Before any forward pass, the weights have to exist. microGPT builds them once, as plain Gaussian random scalars wrapped in `Value` (py lines 99–114):
+
+```python
+matrix = lambda nout, nin, std=0.08: [[Value(random.gauss(0, std)) for _ in range(nin)] for _ in range(nout)]
+state_dict = {'wte': matrix(vocab_size, n_embd), 'wpe': matrix(block_size, n_embd), 'lm_head': matrix(vocab_size, n_embd)}
+for i in range(n_layer):
+    state_dict[f'layer{i}.attn_wq'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wk'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wv'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.attn_wo'] = matrix(n_embd, n_embd)
+    state_dict[f'layer{i}.mlp_fc1'] = matrix(4 * n_embd, n_embd)
+    state_dict[f'layer{i}.mlp_fc2'] = matrix(n_embd, 4 * n_embd)
+params = [p for mat in state_dict.values() for row in mat for p in row]
+```
+
+Every matrix is `nout × nin` of `random.gauss(0, 0.08)` values — a plain normal distribution with standard deviation `0.08`. That is the **entire** initialization: no Xavier, no Kaiming, no special scaling. With `n_embd = 16`, `block_size = 16`, `n_head = 4`, and `vocab_size = len(uchars) + 1`, the `state_dict` holds:
+
+| matrix | shape (nout × nin) | role |
+|---|---|---|
+| `wte` | vocab_size × 16 | token embedding table |
+| `wpe` | 16 × 16 | position embedding table (block_size × n_embd) |
+| `attn_wq` / `wk` / `wv` / `wo` | 16 × 16 each | per-layer Q/K/V projections + output projection |
+| `mlp_fc1` | 64 × 16 | MLP up-projection (4·n_embd × n_embd) |
+| `mlp_fc2` | 16 × 64 | MLP down-projection (n_embd × 4·n_embd) |
+| `lm_head` | vocab_size × 16 | final projection to logits |
+
+`linear(x, w)` reads each weight matrix as `[nout][nin]`, so output `j` is the dot product of `w[j]` with the input. Finally `params` flattens every scalar from every matrix into one flat list — exactly what the **05 · Training & Generation** Adam loop walks over, with one `m`/`v` buffer and one update per scalar, every step.
+
 ## Annotated Code
 
 The block lives in `src/microgpt_annotated.py`, subsection `attention-multihead` (the helpers `linear` / `softmax` / `rmsnorm` are in `overview-pipeline-helpers`):
@@ -76,6 +106,6 @@ The TypeScript port in `src/inference/model.ts` computes the same path. Its diff
 
 ## Sandbox
 
-Each module on the path is a block you can click to see its **input → output shape** and the **exact Python line** it runs. Press play (or scrub) to send a data pulse down the path; the two green arcs are the residual bypasses (saved at ①/② and added back at the matching **Add** stages). The attention stage is the lesson-03 computation reused — it is not recomputed here.
+Each module on the path is a block you can click to see its **input → output shape** and the **exact Python line** it runs. Press play (or scrub) to send a data pulse down the path; the two green arcs are the residual bypasses (saved at ①/② and added back at the matching **Add** stages). The attention stage summarizes the same computation explained in lesson 03 — this lesson focuses on **where attention sits inside the complete block**. It is a map of the block's structure and execution order, not a per-stage inspector of real tensor values (the shapes shown are the static layer dimensions; lesson 03 is where you watch the actual attention numbers).
 
 <TransformerBlockSandbox />

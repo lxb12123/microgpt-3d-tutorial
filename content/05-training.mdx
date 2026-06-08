@@ -50,7 +50,7 @@ for i, p in enumerate(params):
 
 ### Generation: babble back
 
-After training, the model generates one character at a time, starting from BOS, feeding each prediction back as the next input. A **KV cache** (`keys`, `values`) accumulates past context so each new token only does work for itself. **Temperature** divides the logits before softmax — low temperature concentrates the distribution (focused, repetitive), high temperature flattens it (random, creative). It stops when it samples BOS again:
+After training, the model generates one character at a time, starting from BOS, feeding each prediction back as the next input. In Karpathy's Python a growing **KV cache** (`keys`, `values`) accumulates past context so each new token only does work for itself (the browser port computes this differently — see the note under Annotated Code). **Temperature** divides the logits before softmax — low temperature concentrates the distribution (focused, repetitive), high temperature flattens it (random, creative). It stops when it samples BOS again:
 
 ```python
 temperature = 0.5  # in (0, 1]
@@ -67,11 +67,15 @@ for pos_id in range(block_size):
 
 The training loop is `src/microgpt_annotated.py` Section 5 (subsection `overview-training-step`, py lines 194-226); generation is Section 6 (py lines 234-247). The Adam hyperparameters `learning_rate=0.01, beta1=0.85, beta2=0.99, eps=1e-8` and `num_steps=1000` are the values the shipped weights were trained with.
 
-A note on what this sandbox does and does **not** do. The ~89 KB of weights were trained **offline** by the Python file. The browser does not retrain the whole model — that would take far longer than a page visit. Instead the **Train** mode runs **one real Adam step on the LM head** (the rest of the network held fixed): it tokenizes your document, runs the genuine forward pass for the loss, calls `loss.backward()` through the lesson-02 `Value` engine for a true gradient, and applies the exact Adam formula above. Every number it shows comes from that real computation. The **Generate** mode runs the real model autoregressively at the temperature you choose.
+A note on what this sandbox does and does **not** do. The ~89 KB of weights were trained **offline** by the Python file; the browser does not retrain the model.
+
+**Train** mode computes **one real gradient and Adam update calculation** for a single LM-head parameter (the rest of the network held fixed): it tokenizes your document, runs the genuine forward pass for the loss, calls `loss.backward()` through the lesson-02 `Value` engine for a true gradient, and evaluates the exact Adam formula above. Every number is real — but **the calculated update is only displayed, not persisted into the loaded model**, and each input change starts again from fresh Adam buffers at step 0. It is an update *calculation*, not a stored training step, and the model you sample from in Generate mode is unchanged.
+
+**Generate** mode runs the real model autoregressively at the temperature you choose. One execution detail to be precise about: the Python reference uses a growing KV cache, while the browser TypeScript port **recomputes the complete causal prefix at every generation step**. The resulting logits use the same mathematics, but the execution strategy is different — the browser is *not* maintaining an incremental KV cache.
 
 ## Sandbox
 
-- **Generate** — watch the model build a name from BOS. Drag **temperature** and the next-character probability bars reshape live (low = focused, high = random); **resample** draws a different name. It stops when it predicts the STOP sentinel.
-- **Train** — type a document and step through data → forward → loss → backward → Adam. The panel shows the real mean cross-entropy and the real `m / v / m̂ / v̂ / lr_t / Δ` for one LM-head parameter, straight from the formula.
+- **Generate** — watch the model build a name from BOS. Drag **temperature** and the next-character probability bars reshape live (low = focused, high = random); **resample** draws a different name. It stops when it predicts the STOP sentinel. (Each step recomputes the full prefix — same logits, no incremental KV cache.)
+- **Train** — type a document and see one real **gradient + Adam update calculation**: data → forward → loss → backward → Adam. The panel shows the real mean cross-entropy and the real `m / v / m̂ / v̂ / lr_t / Δ` for one LM-head parameter, straight from the formula. The update is **shown, not saved** — change the input and it recomputes from fresh Adam buffers at step 0.
 
 <TrainingSandbox defaultDoc="emma" />

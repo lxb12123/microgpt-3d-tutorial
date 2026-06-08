@@ -9,7 +9,7 @@ a complete decoder-only transformer written in pure Python, no libraries.
 The four primitives above — TokenCubes, NodeBlocks, ConnectorArrows, and a
 MatrixGrid — are the entire visual vocabulary every lesson speaks. The
 model is small enough to run entirely in your browser: the TypeScript port
-ships about ~89 KB of trained weights and computes every logit you see in
+ships ~89 KB of trained weights and computes every logit you see in
 the 3D scenes live, with no backend.
 
 ## What's inside
@@ -50,6 +50,6 @@ A reasonable path is straight through **01 → 05**, but each lesson stands alon
 
 The code, the Blender scripts that generated every `.glb`, and the
 implementation plans live in the [repo](https://github.com/lxb12123/microgpt-3d-tutorial).
-The README has dev setup. The five lessons now cover the whole reference file
-end to end; future work (multi-layer configs, training-in-the-browser) is
-tracked in the spec.
+The README has dev setup. The five lessons cover the complete training,
+forward-pass, and generation algorithm; future work (multi-layer configs,
+training-in-the-browser) is tracked in the spec.

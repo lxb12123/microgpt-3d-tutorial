@@ -74,7 +74,7 @@ export const STAGES: readonly Stage[] = [
     inShape: `[${N_EMBD}]`,
     outShape: `[${N_EMBD}]`,
     code: "q = linear(x, attn_wq); k = linear(x, attn_wk); v = linear(x, attn_wv)\n# per head h: softmax(q_h·k_hᵀ / √head_dim) · v_h, then concat the 4 heads\nx_attn = concat(head_out for h in range(n_head))",
-    note: 'This is exactly lesson 03 — the same q·kᵀ/√d → softmax → ·v, reused here, not recomputed. 4 heads × head_dim 4 = 16.',
+    note: 'Summarizes the same q·kᵀ/√d → softmax → ·v explained in lesson 03 — shown here as one stage to mark where attention sits in the block, not as a live tensor check. 4 heads × head_dim 4 = 16.',
   },
   {
     id: 'attn_wo',

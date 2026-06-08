@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { LazyMount } from './LazyMount';
+import { HeroPlaceholder } from './HeroPlaceholder';
 import type { AutogradSandboxProps } from './autograd/AutogradSandbox';
 import type { AttentionSandboxProps } from './attention/AttentionSandbox';
 import type { OverviewSandboxProps } from './overview/OverviewSandbox';
@@ -40,7 +41,7 @@ const TrainingSandboxImpl = dynamic(
 
 const HomeHeroImpl = dynamic(
   () => import('./HomeHero').then((m) => m.HomeHero),
-  { ssr: false, loading: () => <p>Loading 3D hero…</p> },
+  { ssr: false, loading: () => <HeroPlaceholder /> },
 );
 
 export function AutogradSandbox(props: AutogradSandboxProps) {
@@ -70,5 +71,7 @@ export function TrainingSandbox(props: TrainingSandboxProps) {
 // element), but the gate keeps the chunk off the critical path for any other
 // page that ever embeds this.
 export function HomeHero() {
-  return <LazyMount minHeight={440}><HomeHeroImpl /></LazyMount>;
+  // minHeight matches the hero's outer box (24px padding × 2 + 440px stage) so the
+  // skeleton → canvas swap never shifts layout.
+  return <LazyMount minHeight={488} placeholder={<HeroPlaceholder />}><HomeHeroImpl /></LazyMount>;
 }

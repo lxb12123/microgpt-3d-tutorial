@@ -9,6 +9,10 @@ export interface LazyMountProps {
   minHeight?: number;
   /** Distance below the viewport at which to mount. Larger = earlier. */
   rootMargin?: string;
+  /** Rendered before the wrapper intersects (e.g. a skeleton). Defaults to nothing —
+   *  most sandboxes are below the fold, where a reserved blank is fine. The home hero
+   *  passes a skeleton so its above-the-fold slot is never a bare empty box. */
+  placeholder?: ReactNode;
 }
 
 // Defers child mount until the wrapper is near the viewport. Used to gate the
@@ -25,6 +29,7 @@ export function LazyMount({
   children,
   minHeight = 520,
   rootMargin = '300px',
+  placeholder = null,
 }: LazyMountProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -45,5 +50,5 @@ export function LazyMount({
     return () => obs.disconnect();
   }, [visible, rootMargin]);
 
-  return <div ref={ref} style={{ minHeight }}>{visible ? children : null}</div>;
+  return <div ref={ref} style={{ minHeight }}>{visible ? children : placeholder}</div>;
 }
