@@ -2,7 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Billboard } from '@react-three/drei';
 import { SceneViewer } from '@/components/3d/SceneViewer';
 import { SceneText } from '@/components/3d/overview/scene/SceneText';
@@ -104,6 +104,9 @@ export function HomeHero() {
   const compact = useCompactLayout();
   const L = compact ? COMPACT : WIDE;
   const router = useRouter();
+  // The hovered primitive's one-line explanation, shown in a fixed strip below the
+  // canvas (an in-scene tooltip got clipped by the canvas card at the right/bottom).
+  const [hoverText, setHoverText] = useState<string | null>(null);
 
   // 2×2 grid slots derived from the active layout.
   const slot = {
@@ -118,7 +121,7 @@ export function HomeHero() {
     labelColor: p.labelColor,
     captionColor: p.captionColor,
     halo: p.halo,
-    card: p.card,
+    onHover: setHoverText,
     float: animate,
     headingOffset: L.headingOffset,
     captionOffset: L.captionOffset,
@@ -325,6 +328,40 @@ export function HomeHero() {
           ))}
         </LegendZone>
       </SceneViewer>
+
+      {/* Hover explanation — a fixed strip below the canvas. Reserved height keeps
+          the layout stable; it can never be clipped the way an in-canvas tooltip
+          was for the right-column / bottom zones. aria-live announces it for AT. */}
+      <div
+        aria-live="polite"
+        style={{
+          minHeight: 30,
+          marginTop: 10,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        {hoverText && (
+          <span
+            style={{
+              fontFamily: 'ui-monospace, monospace',
+              fontSize: 12,
+              fontWeight: 600,
+              color: p.card.text,
+              background: p.card.bg,
+              border: `1px solid ${p.card.border}`,
+              borderRadius: 8,
+              padding: '5px 12px',
+              maxWidth: '100%',
+              textAlign: 'center',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
+            }}
+          >
+            {hoverText}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

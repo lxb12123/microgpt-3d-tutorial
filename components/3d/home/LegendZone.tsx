@@ -1,8 +1,8 @@
 'use client';
 
-import { Billboard, Html } from '@react-three/drei';
+import { Billboard } from '@react-three/drei';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { Group } from 'three';
 import { SceneText } from '@/components/3d/overview/scene/SceneText';
 
@@ -22,7 +22,10 @@ export interface LegendZoneProps {
   accentColor: string;
   /** Legibility outline for the in-scene text. */
   halo: string;
-  card: { bg: string; text: string; border: string };
+  /** Lifts the hover explanation to a fixed caption strip below the canvas, so it
+   *  is never clipped by the canvas card the way an in-scene tooltip was at the
+   *  right/bottom edges. Called with the tooltip on enter, `null` on leave. */
+  onHover?: (tooltip: string | null) => void;
   /** Ambient float allowed (false under prefers-reduced-motion). */
   float: boolean;
   /** Per-zone phase so the four zones don't bob in lockstep. */
@@ -43,23 +46,6 @@ const FLOAT_AMP = 0.06;
 // as an orbit-drag, not a navigation intent.
 const DRAG_PX = 6;
 
-function tooltipStyle(card: LegendZoneProps['card']): CSSProperties {
-  return {
-    pointerEvents: 'none',
-    userSelect: 'none',
-    whiteSpace: 'nowrap',
-    fontFamily: 'ui-monospace, monospace',
-    fontSize: 11,
-    fontWeight: 600,
-    color: card.text,
-    background: card.bg,
-    border: `1px solid ${card.border}`,
-    borderRadius: 7,
-    padding: '5px 9px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-  };
-}
-
 export function LegendZone({
   center,
   title,
@@ -69,7 +55,7 @@ export function LegendZone({
   captionColor,
   accentColor,
   halo,
-  card,
+  onHover,
   float,
   floatPhase,
   onNavigate,
@@ -101,11 +87,13 @@ export function LegendZone({
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
         setHovered(true);
+        onHover?.(tooltip);
         document.body.style.cursor = 'pointer';
       }}
       onPointerOut={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
         setHovered(false);
+        onHover?.(null);
         document.body.style.cursor = '';
       }}
       onPointerDown={(e: ThreeEvent<PointerEvent>) => {
@@ -142,12 +130,6 @@ export function LegendZone({
           {caption}
         </SceneText>
       </Billboard>
-
-      {hovered && (
-        <Html position={[0, -1.5, 0]} center distanceFactor={9} style={tooltipStyle(card)} zIndexRange={[20, 0]}>
-          {tooltip}
-        </Html>
-      )}
     </group>
   );
 }
