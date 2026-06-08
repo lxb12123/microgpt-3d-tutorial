@@ -47,7 +47,7 @@ def rmsnorm(x):
     return [xi * scale for xi in x]
 ```
 
-The training step (subsection `overview-training-step`) is just: forward → compute loss against the truth → `loss.backward()` → SGD step on every parameter. The TypeScript port in `src/inference/{model,value,weights}.ts` implements the same forward path so this sandbox can run it live in your browser, on the actual ~10 KB weights checked into the repo.
+The training step (subsection `overview-training-step`) is just: forward → compute loss against the truth → `loss.backward()` → an **Adam** update (with linear learning-rate decay) on every parameter — the optimizer is the subject of **[05 · Training & Generation](/05-training)**. The TypeScript port in `src/inference/{model,value,weights}.ts` implements the same forward path so this sandbox can run it live in your browser, on the actual ~89 KB of trained weights checked into the repo.
 
 ## Sandbox
 

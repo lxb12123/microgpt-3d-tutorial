@@ -64,7 +64,7 @@ Node `>= 20.10`, pnpm `>= 9` (see `engines` in `package.json`).
 - `public/models/` — Committed `.glb` assets (one subdir per lesson plus
   shared `primitives/`). `scripts/check-assets.mjs` enforces size, naming,
   and location rules at build time. `public/data/` holds the trained
-  microGPT weights blob (~88 KB) served to the browser.
+  microGPT weights blob (~89 KB) served to the browser.
 - `scripts/` — Build-time helpers: `check-assets.mjs`, the inference
   benchmark, and `train_and_export_weights.py` (one-shot weight export).
 - `tests/e2e/` — Playwright smoke tests (one per lesson + homepage).
