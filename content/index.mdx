@@ -19,28 +19,37 @@ annotated Python slice it's about, and an interactive 3D sandbox you can
 poke. Sandboxes are theme-aware (warm light / cyber dark) and pause-and-seek
 along a timeline scrubber.
 
-- **[01 · Overview](/01-overview)** — data → forward → loss → sample in
-  thirty seconds. Hit a preset, watch one transformer block do its job.
+- **[01 · Overview](/01-overview)** — the whole loop in thirty seconds:
+  characters in, a probability for every possible next character out. Forward,
+  loss, and sampling as three modes you can drive.
 - **[02 · Autograd](/02-autograd)** — Karpathy's 25-line Value class as a
   rotatable DAG. Type any expression, drag the variables, play forward and
-  backward pulses.
-- **[03 · Attention](/03-attention)** — Q · Kᵀ, softmax, V — stacked as
-  six matrices around one head you pick. Click a score cell for its dot
+  backward pulses. This is how `.backward()` works.
+- **[03 · Attention](/03-attention)** — one head, one query: `q·kᵀ/√d` →
+  causal mask → softmax → weighted values. Click a score cell for its dot
   product.
+- **[04 · Transformer Block](/04-transformer-block)** — the `gpt()` function
+  itself: embedding → RMSNorm → attention → residual → MLP → residual → logits.
+  Click any module for its input/output shapes and exact Python.
+- **[05 · Training & Generation](/05-training)** — the rest of the file: watch a
+  name generated character by character with a live temperature slider, and step
+  through one real Adam update (forward → loss → backward → optimizer).
 
 ## How to read this
 
-If you've never seen a transformer's insides, start with 01.
+A reasonable path is straight through **01 → 05**, but each lesson stands alone:
 
-If you already know what attention is and want to see the math wired up to
-3D, jump to 03.
-
-If you've ever wondered "but how does .backward() actually work", 02 is the
-shortest path.
+- New to transformers? Start at **01** for the bird's-eye loop, then **04** to see
+  the forward pass wired up end to end.
+- Want the math of attention? Jump to **03**.
+- Wondered how `.backward()` actually works? **02** is the shortest path — and **05**
+  shows that same gradient driving a real Adam step.
+- Curious how the model learns, then babbles brand-new names? **05**.
 
 ## Beyond V1
 
 The code, the Blender scripts that generated every `.glb`, and the
 implementation plans live in the [repo](https://github.com/lxb12123/microgpt-3d-tutorial).
-The README has dev setup. Future lessons (04 training, dark-mode-adaptive
-materials, mobile) are tracked in the spec.
+The README has dev setup. The five lessons now cover the whole reference file
+end to end; future work (multi-layer configs, training-in-the-browser) is
+tracked in the spec.
