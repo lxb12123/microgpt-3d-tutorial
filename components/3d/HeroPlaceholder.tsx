@@ -23,6 +23,7 @@ function useScheme(): 'light' | 'dark' {
 export function HeroPlaceholder() {
   const scheme = useScheme();
   const p = scheme === 'light' ? LIGHT_PALETTE : DARK_PALETTE;
+  const preview = `/microgpt-3d-tutorial/models/previews/hero-${scheme}.png`;
   return (
     <div
       role="img"
@@ -40,7 +41,19 @@ export function HeroPlaceholder() {
           overflow: 'hidden',
         }}
       >
+        {/* A still of the actual legend, theme-matched, so the loading slot looks
+            like the scene about to appear rather than a near-white blank. */}
+        <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         <div className="hero-skeleton-shimmer" />
+        <div
+          style={{
+            position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+            fontFamily: 'ui-monospace, monospace', fontSize: 12, color: p.card.text,
+            background: p.card.bg, border: `1px solid ${p.card.border}`, padding: '4px 12px', borderRadius: 999,
+          }}
+        >
+          loading interactive scene…
+        </div>
         <style>{`
           .hero-skeleton-shimmer {
             position: absolute;

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { useFrame, useThree } from '@react-three/fiber';
 import type { PerspectiveCamera } from 'three';
 import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
-import { ModeSelector, ParamSlider, PlayPauseScrubber, getSandboxPalette } from '@/components/3d/hud';
+import { ModeSelector, ParamSlider, PlayPauseScrubber, getSandboxPalette, StepHints } from '@/components/3d/hud';
 import { gpt } from '@/src/inference/model';
 import { loadWeights, type Weights } from '@/src/inference/weights';
 import { Tokenizer } from '@/src/inference/tokenizer';
@@ -166,6 +166,14 @@ export function TrainingSandbox({ defaultDoc = 'emma' }: TrainingSandboxProps) {
 
   return (
     <div>
+      <StepHints
+        scheme={scheme}
+        steps={[
+          'choose Generate or Train',
+          mode === 'generate' ? 'drag temperature to reshape the bars' : 'type a document (or pick a name)',
+          'press Play',
+        ]}
+      />
       <SceneViewer
         height="560px"
         fallbackImage="/microgpt-3d-tutorial/models/previews/training.png"

@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+/* Hide Nextra's heading permalink "#" glyph so it never reads as part of the
+   visible title (reviewers saw "Sandbox #"). Heading `id`s are untouched, so the
+   table-of-contents and deep links (e.g. #sandbox) keep working. */
+.subheading-anchor::after {
+  content: none !important;
+}

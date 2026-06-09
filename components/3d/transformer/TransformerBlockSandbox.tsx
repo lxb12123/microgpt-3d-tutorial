@@ -1,14 +1,30 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useRef, useState, useSyncExternalStore } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import type { PerspectiveCamera } from 'three';
 import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
-import { PlayPauseScrubber } from '@/components/3d/hud';
+import { PlayPauseScrubber, StepHints } from '@/components/3d/hud';
 import { STAGES, RESIDUALS, stageIndex, type StageGroup } from './pipeline';
 import { computeBlockState } from './scheduler';
 import { getBlockTheme } from './theme';
-import { BlockScene } from './BlockScene';
+import { BlockScene, BLOCK_CONTENT } from './BlockScene';
+
+/** Scales the legend to use the full canvas on any aspect (wide desktop / phone). */
+function FitGroup({ halfWidth, halfHeight, children }: {
+  halfWidth: number; halfHeight: number; children: ReactNode;
+}) {
+  const size = useThree((s) => s.size);
+  const camera = useThree((s) => s.camera) as PerspectiveCamera;
+  const aspect = size.width / Math.max(1, size.height);
+  const tanV = Math.tan(((camera.fov ?? 42) * Math.PI) / 180 / 2);
+  const z = camera.position.z || 9.2;
+  const visHalfH = z * tanV;
+  const visHalfW = visHalfH * aspect;
+  const scale = Math.min(visHalfH / halfHeight, visHalfW / halfWidth, 1.1) * 0.95;
+  return <group scale={scale}>{children}</group>;
+}
 
 const noopSubscribe = () => () => {};
 function useResolvedScheme(): 'light' | 'dark' {
@@ -102,6 +118,10 @@ export function TransformerBlockSandbox({ autoplay = true }: TransformerBlockSan
 
   return (
     <div>
+      <StepHints
+        scheme={scheme}
+        steps={['press Play to send a pulse down the path', 'click any module', 'read its shapes + exact Python below']}
+      />
       <SceneViewer
         height="560px"
         fallbackImage="/microgpt-3d-tutorial/models/previews/transformer-block.png"
@@ -120,10 +140,9 @@ export function TransformerBlockSandbox({ autoplay = true }: TransformerBlockSan
         }}
       >
         <TimelineClock playing={playing} tRef={tRef} onTick={setT} />
-        {/* Column is shifted down a touch so the top block clears the HUD overlay. */}
-        <group position={[-0.4, -0.35, 0]} scale={0.54}>
+        <FitGroup halfWidth={BLOCK_CONTENT.halfWidth} halfHeight={BLOCK_CONTENT.halfHeight}>
           <BlockScene state={state} selectedIndex={selected} onSelect={onSelect} theme={theme} />
-        </group>
+        </FitGroup>
       </SceneViewer>
 
       {/* Detail panel — shapes + the exact Python slice for the selected module. */}

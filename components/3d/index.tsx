@@ -3,6 +3,9 @@
 import dynamic from 'next/dynamic';
 import { LazyMount } from './LazyMount';
 import { HeroPlaceholder } from './HeroPlaceholder';
+import { SandboxLoading } from './SandboxLoading';
+
+const PREVIEW = '/microgpt-3d-tutorial/models/previews';
 import type { AutogradSandboxProps } from './autograd/AutogradSandbox';
 import type { AttentionSandboxProps } from './attention/AttentionSandbox';
 import type { OverviewSandboxProps } from './overview/OverviewSandbox';
@@ -16,27 +19,27 @@ import type { TrainingSandboxProps } from './training/TrainingSandbox';
 
 const AutogradSandboxImpl = dynamic(
   () => import('./autograd/AutogradSandbox').then((m) => m.AutogradSandbox),
-  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+  { ssr: false, loading: () => <SandboxLoading preview={`${PREVIEW}/autograd.png`} height={600} /> },
 );
 
 const AttentionSandboxImpl = dynamic(
   () => import('./attention/AttentionSandbox').then((m) => m.AttentionSandbox),
-  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+  { ssr: false, loading: () => <SandboxLoading preview={`${PREVIEW}/attention.png`} height={640} /> },
 );
 
 const OverviewSandboxImpl = dynamic(
   () => import('./overview/OverviewSandbox').then((m) => m.OverviewSandbox),
-  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+  { ssr: false, loading: () => <SandboxLoading preview={`${PREVIEW}/overview.png`} height={560} /> },
 );
 
 const TransformerBlockSandboxImpl = dynamic(
   () => import('./transformer/TransformerBlockSandbox').then((m) => m.TransformerBlockSandbox),
-  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+  { ssr: false, loading: () => <SandboxLoading preview={`${PREVIEW}/transformer-block.png`} height={560} /> },
 );
 
 const TrainingSandboxImpl = dynamic(
   () => import('./training/TrainingSandbox').then((m) => m.TrainingSandbox),
-  { ssr: false, loading: () => <p>Loading 3D sandbox…</p> },
+  { ssr: false, loading: () => <SandboxLoading preview={`${PREVIEW}/training.png`} height={560} /> },
 );
 
 const HomeHeroImpl = dynamic(

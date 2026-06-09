@@ -69,7 +69,7 @@ export const STAGES: readonly Stage[] = [
   },
   {
     id: 'attn',
-    label: 'Multi-Head Attn',
+    label: 'Attention',
     group: 'attn',
     inShape: `[${N_EMBD}]`,
     outShape: `[${N_EMBD}]`,
@@ -78,7 +78,7 @@ export const STAGES: readonly Stage[] = [
   },
   {
     id: 'attn_wo',
-    label: 'Proj attn_wo',
+    label: 'attn_wo',
     group: 'attn',
     inShape: `[${N_EMBD}]`,
     outShape: `[${N_EMBD}]`,
@@ -87,7 +87,7 @@ export const STAGES: readonly Stage[] = [
   },
   {
     id: 'add1',
-    label: 'Add Residual ①',
+    label: 'Add ①',
     group: 'add',
     inShape: `[${N_EMBD}] + [${N_EMBD}]`,
     outShape: `[${N_EMBD}]`,
@@ -132,7 +132,7 @@ export const STAGES: readonly Stage[] = [
   },
   {
     id: 'add2',
-    label: 'Add Residual ②',
+    label: 'Add ②',
     group: 'add',
     inShape: `[${N_EMBD}] + [${N_EMBD}]`,
     outShape: `[${N_EMBD}]`,

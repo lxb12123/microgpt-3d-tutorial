@@ -43,6 +43,8 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByText('is the lesson-03 computation reused')).toHaveCount(0);
       await expect(page.getByRole('heading', { name: /Parameter Initialization/i })).toBeVisible();
       await expect(page.locator('h2#sandbox')).toHaveText('Sandbox');
+      // Three-step operation hints are shown above the sandbox.
+      await expect(page.getByTestId('step-hints')).toBeVisible();
 
       await page.screenshot({ path: `/tmp/04-transformer-${vp.name}-${colorScheme}.png`, fullPage: true });
       expect(errors, `console errors (${vp.name}/${colorScheme}):\n${errors.join('\n')}`).toEqual([]);

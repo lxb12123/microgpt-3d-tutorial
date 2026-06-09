@@ -6,3 +6,5 @@ export { ParamSlider } from './ParamSlider';
 export type { ParamSliderProps } from './ParamSlider';
 export { getSandboxPalette } from './SandboxPalette';
 export type { SandboxPalette, LessonId, ColorScheme } from './SandboxPalette';
+export { StepHints } from './StepHints';
+export type { StepHintsProps } from './StepHints';

@@ -138,7 +138,7 @@ export function HomeHero() {
     >
       <SceneViewer
         height="440px"
-        fallbackImage="/microgpt-3d-tutorial/models/previews/hello.png"
+        fallbackImage="/microgpt-3d-tutorial/models/previews/hero-dark.png"
         bgColor={p.stageBg}
         lighting={p.lighting}
         cameraPosition={[0, L.fit.targetY, 12]}

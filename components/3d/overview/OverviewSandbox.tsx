@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { SceneViewer } from '@/components/3d/SceneViewer';
-import { ModeSelector, PlayPauseScrubber, getSandboxPalette } from '@/components/3d/hud';
+import { ModeSelector, PlayPauseScrubber, getSandboxPalette, StepHints } from '@/components/3d/hud';
 import { gpt } from '@/src/inference/model';
 import { loadWeights, type Weights } from '@/src/inference/weights';
 import { Tokenizer } from '@/src/inference/tokenizer';
@@ -164,7 +164,12 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
   const lastBarX = barX(bars.length - 1);
 
   return (
-    <SceneViewer
+    <>
+      <StepHints
+        scheme={scheme}
+        steps={['type text or pick a preset', 'switch Forward / Loss / Sample', 'press Play to sweep']}
+      />
+      <SceneViewer
       height="560px"
       fallbackImage="/microgpt-3d-tutorial/models/previews/overview.png"
       hud={hud}
@@ -212,5 +217,6 @@ export function OverviewSandbox({ defaultText }: OverviewSandboxProps) {
         </group>
       )}
     </SceneViewer>
+    </>
   );
 }

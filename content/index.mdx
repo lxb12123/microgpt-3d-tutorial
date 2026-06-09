@@ -32,8 +32,8 @@ along a timeline scrubber.
   itself: embedding → RMSNorm → attention → residual → MLP → residual → logits.
   Click any module for its input/output shapes and exact Python.
 - **[05 · Training & Generation](/05-training)** — the rest of the file: watch a
-  name generated character by character with a live temperature slider, and step
-  through one real Adam update (forward → loss → backward → optimizer).
+  name generated character by character with a live temperature slider, and see one
+  real gradient and Adam update calculation (forward → loss → backward → optimizer).
 
 ## How to read this
 
@@ -43,7 +43,7 @@ A reasonable path is straight through **01 → 05**, but each lesson stands alon
   the forward pass wired up end to end.
 - Want the math of attention? Jump to **03**.
 - Wondered how `.backward()` actually works? **02** is the shortest path — and **05**
-  shows that same gradient driving a real Adam step.
+  shows that same gradient driving a real Adam update calculation.
 - Curious how the model learns, then babbles brand-new names? **05**.
 
 ## Beyond V1

@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
-import { ModeSelector, PlayPauseScrubber } from '@/components/3d/hud';
+import { ModeSelector, PlayPauseScrubber, StepHints } from '@/components/3d/hud';
 import { parse, type AstNode } from '@/src/inference/parser';
 import { buildDag } from './buildDag';
 import { layoutDag } from './layout';
@@ -191,7 +191,12 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
   const litOf = (id: string) => phase === 'fwd' ? (state.valueRevealed[id] ?? false) : (state.gradRevealed[id] ?? false);
 
   return (
-    <SceneViewer
+    <>
+      <StepHints
+        scheme={scheme}
+        steps={['type an expression or pick a preset', 'drag a variable slider', 'play Forward, then Backward']}
+      />
+      <SceneViewer
       height="600px"
       fallbackImage="/microgpt-3d-tutorial/models/previews/autograd.png"
       hud={hud}
@@ -283,5 +288,6 @@ export function AutogradSandbox({ defaultExpression, defaultVariables }: Autogra
         })}
       </group>
     </SceneViewer>
+    </>
   );
 }

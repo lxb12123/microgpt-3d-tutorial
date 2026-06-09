@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { SceneViewer, type SceneLighting } from '@/components/3d/SceneViewer';
-import { PlayPauseScrubber } from '@/components/3d/hud';
+import { PlayPauseScrubber, StepHints } from '@/components/3d/hud';
 import { gpt } from '@/src/inference/model';
 import { loadWeights, type Weights } from '@/src/inference/weights';
 import { Tokenizer } from '@/src/inference/tokenizer';
@@ -194,7 +194,12 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
   const sm = state.progress.softmax;
 
   return (
-    <SceneViewer
+    <>
+      <StepHints
+        scheme={scheme}
+        steps={['pick a query token i (and head)', 'press Play to watch the phases', 'click "inspect q·k" for the dot product']}
+      />
+      <SceneViewer
       height="640px"
       fallbackImage="/microgpt-3d-tutorial/models/previews/attention.png"
       hud={hud}
@@ -344,5 +349,6 @@ export function AttentionSandbox({ defaultText }: AttentionSandboxProps) {
         </group>
       )}
     </SceneViewer>
+    </>
   );
 }
