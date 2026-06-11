@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useSyncExternalStore, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as webgl from './webgl';
@@ -39,6 +39,11 @@ export interface SceneViewerProps {
   /** Optional OrbitControls limits (clamp rotation/zoom so the reader can't
    *  drag the scene to an unreadable angle). When omitted, controls are free. */
   controls?: OrbitControlsLimits;
+  /** Optional overlay kept above the canvas until the scene subtree actually
+   *  commits (every suspending resource — SDF font, .glb meshes — resolved),
+   *  then faded out. Lets a loading preview stay up across the placeholder →
+   *  canvas handoff instead of dropping to a blank stage while assets stream. */
+  loadingOverlay?: ReactNode;
 }
 
 export interface OrbitControlsLimits {
@@ -78,6 +83,21 @@ function useWebGLAvailable(): boolean {
   );
 }
 
+// Fade duration for the loading overlay, plus when to unmount it (a beat after
+// the fade so the transition always completes).
+const OVERLAY_FADE_MS = 300;
+const OVERLAY_UNMOUNT_MS = 450;
+
+// Sibling of the scene inside the same Suspense boundary: while any resource
+// (font, .glb) is still loading the whole boundary shows the fallback, so this
+// effect fires only once the scene has truly committed.
+function SceneReadySignal({ onReady }: { onReady: () => void }) {
+  useEffect(() => {
+    onReady();
+  }, [onReady]);
+  return null;
+}
+
 export function SceneViewer({
   height,
   fallbackImage,
@@ -88,8 +108,20 @@ export function SceneViewer({
   cameraPosition = [3, 3, 3],
   cameraFov = 50,
   controls,
+  loadingOverlay,
 }: SceneViewerProps) {
   const webglAvailable = useWebGLAvailable();
+  const [sceneReady, setSceneReady] = useState(false);
+  const [overlayGone, setOverlayGone] = useState(false);
+  const handleSceneReady = useCallback(() => setSceneReady(true), []);
+  // If the 3D subtree throws, drop the overlay immediately so it never covers
+  // the error card.
+  const dropOverlay = useCallback(() => setOverlayGone(true), []);
+  useEffect(() => {
+    if (!sceneReady) return;
+    const t = setTimeout(() => setOverlayGone(true), OVERLAY_UNMOUNT_MS);
+    return () => clearTimeout(t);
+  }, [sceneReady]);
 
   if (!webglAvailable) {
     return (
@@ -106,7 +138,7 @@ export function SceneViewer({
   return (
     <div style={{ width: '100%', height, position: 'relative' }}>
       {hud ? <div data-hud style={{ position: 'absolute', top: 8, left: 8, zIndex: 10 }}>{hud}</div> : null}
-      <SceneErrorBoundary>
+      <SceneErrorBoundary onError={dropOverlay}>
         <Canvas camera={{ position: cameraPosition, fov: cameraFov }}>
           {/* Multi-source rig driven by the `lighting` prop. The default rig
               keeps the cyberpunk look (cool hemi + magenta key + cyan rim);
@@ -118,7 +150,10 @@ export function SceneViewer({
           <ambientLight intensity={lighting.ambient} />
           <directionalLight position={[5, 8, 5]} intensity={lighting.key} color={lighting.keyColor} castShadow={false} />
           <directionalLight position={[-4, 3, -4]} intensity={lighting.rim} color={lighting.rimColor} />
-          <Suspense fallback={null}>{children}</Suspense>
+          <Suspense fallback={null}>
+            {children}
+            {loadingOverlay != null ? <SceneReadySignal onReady={handleSceneReady} /> : null}
+          </Suspense>
           <OrbitControls
             makeDefault
             enablePan={controls?.enablePan ?? true}
@@ -132,6 +167,21 @@ export function SceneViewer({
           />
         </Canvas>
       </SceneErrorBoundary>
+      {loadingOverlay != null && !overlayGone ? (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            pointerEvents: 'none',
+            opacity: sceneReady ? 0 : 1,
+            transition: `opacity ${OVERLAY_FADE_MS}ms ease`,
+          }}
+        >
+          {loadingOverlay}
+        </div>
+      ) : null}
     </div>
   );
 }

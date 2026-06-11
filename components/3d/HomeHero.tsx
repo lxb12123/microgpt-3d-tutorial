@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useSyncExternalStore } from 'react';
 import { Billboard } from '@react-three/drei';
 import { SceneViewer } from '@/components/3d/SceneViewer';
+import { HeroStagePreview } from '@/components/3d/HeroPlaceholder';
 import { SceneText } from '@/components/3d/overview/scene/SceneText';
 import { NodeBlock } from '@/components/3d/primitives/NodeBlock';
 import { ConnectorArrow } from '@/components/3d/primitives/ConnectorArrow';
@@ -141,6 +142,7 @@ export function HomeHero() {
         fallbackImage={`/microgpt-3d-tutorial/models/previews/hero-${theme}.png`}
         bgColor={p.stageBg}
         lighting={p.lighting}
+        loadingOverlay={<HeroStagePreview />}
         cameraPosition={[0, L.fit.targetY, 12]}
         cameraFov={50}
         controls={{

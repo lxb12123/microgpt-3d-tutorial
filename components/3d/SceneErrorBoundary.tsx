@@ -6,7 +6,10 @@ interface State {
   hasError: boolean;
 }
 
-export class SceneErrorBoundary extends Component<{ children: ReactNode }, State> {
+export class SceneErrorBoundary extends Component<
+  { children: ReactNode; onError?: () => void },
+  State
+> {
   state: State = { hasError: false };
 
   static getDerivedStateFromError(): State {
@@ -16,6 +19,7 @@ export class SceneErrorBoundary extends Component<{ children: ReactNode }, State
   componentDidCatch(error: unknown) {
     // Surface to dev tools; do not crash the page.
     console.error('[SceneViewer] caught error in 3D subtree:', error);
+    this.props.onError?.();
   }
 
   handleReload = () => {
