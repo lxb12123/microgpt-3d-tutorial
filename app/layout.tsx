@@ -16,7 +16,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <Head />
       <body>
         <Layout
-          navbar={<Navbar logo={<b>microGPT 3D</b>} />}
+          navbar={
+            <Navbar
+              logo={<b>microGPT 3D</b>}
+              projectLink="https://github.com/lxb12123/microgpt-3d-tutorial"
+            />
+          }
           pageMap={pageMap}
           docsRepositoryBase="https://github.com/lxb12123/microgpt-3d-tutorial/tree/main"
         >
